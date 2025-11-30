@@ -1,0 +1,5 @@
+{
+  "name": "AutoPeças AI - Gestão de Estoque",
+  "description": "Sistema inteligente de cadastro e pesquisa de peças automotivas com validação de dados, controle de códigos (Interno/Original) e preenchimento via IA.",
+  "requestFramePermissions": []
+}
