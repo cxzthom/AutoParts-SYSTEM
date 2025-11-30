@@ -1,11 +1,12 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import pkg from 'electron-updater';
+const { autoUpdater } = pkg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Previne que o Garbage Collection feche a janela
 let mainWindow;
 
 function createWindow() {
@@ -15,23 +16,21 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 768,
     title: 'AutoParts ERP - Enterprise Edition',
-    icon: path.join(__dirname, '../public/favicon.ico'), // Certifique-se de ter um ícone aqui
+    icon: path.join(__dirname, '../public/favicon.ico'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     },
-    autoHideMenuBar: true // Visual mais limpo, estilo app moderno
+    autoHideMenuBar: true
   });
 
-  // Em desenvolvimento, carrega do Vite Server. Em produção, carrega o HTML buildado.
   const startUrl = process.env.NODE_ENV === 'development' 
     ? 'http://localhost:5173' 
     : `file://${path.join(__dirname, '../dist/index.html')}`;
 
   mainWindow.loadURL(startUrl);
 
-  // Abrir DevTools apenas em desenvolvimento
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
@@ -39,7 +38,32 @@ function createWindow() {
   mainWindow.on('closed', function () {
     mainWindow = null;
   });
+
+  // Check for updates once the window is ready
+  mainWindow.once('ready-to-show', () => {
+    if (process.env.NODE_ENV !== 'development') {
+      autoUpdater.checkForUpdatesAndNotify();
+    }
+  });
 }
+
+// --- Auto Updater Events ---
+autoUpdater.on('update-available', () => {
+  if (mainWindow) mainWindow.webContents.send('update_available');
+});
+
+autoUpdater.on('update-downloaded', () => {
+  if (mainWindow) mainWindow.webContents.send('update_downloaded');
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  if (mainWindow) mainWindow.webContents.send('download_progress', progressObj.percent);
+});
+
+// IPC Listener para reiniciar e instalar
+ipcMain.on('restart_app', () => {
+  autoUpdater.quitAndInstall();
+});
 
 app.whenReady().then(() => {
   createWindow();

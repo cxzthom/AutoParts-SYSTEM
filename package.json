@@ -1,18 +1,23 @@
 {
   "name": "autoparts-erp-mobile",
   "private": true,
-  "version": "3.2.0",
+  "version": "1.0.2",
   "main": "electron/main.js",
   "description": "Sistema ERP para Gestão de Autopeças (Desktop & Mobile)",
   "author": "AutoParts IT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "vite build && electron-builder",
+    "electron:publish": "vite build && electron-builder --publish always",
     "android:init": "npx cap add android",
     "android:sync": "npm run build && npx cap sync",
     "android:open": "npx cap open android"
@@ -21,6 +26,7 @@
     "@capacitor/android": "^5.7.0",
     "@capacitor/core": "^5.7.0",
     "@google/genai": "^0.1.1",
+    "electron-updater": "^6.1.8",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
@@ -37,3 +43,39 @@
     "cross-env": "^7.0.3",
     "electron": "^30.0.1",
     "electron-builder": "^24.13.3",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.6",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "typescript": "^5.2.2",
+    "vite": "^5.2.0",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.autoparts.erp",
+    "productName": "AutoParts ERP",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/favicon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "SEU_USUARIO_GITHUB",
+        "repo": "NOME_DO_REPO"
+      }
+    ]
+  }
+}

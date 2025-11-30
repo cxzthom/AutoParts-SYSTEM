@@ -1,7 +1,5 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, PlusCircle, Menu, X, Car, LogOut, ShoppingCart, UserCircle, Wrench, Users, ShieldCheck, ClipboardList, Bus, Loader2, Cloud, RefreshCw, DollarSign, Server, FileClock, Map } from 'lucide-react';
+import { Package, PlusCircle, Menu, X, Car, LogOut, ShoppingCart, UserCircle, Wrench, Users, ShieldCheck, ClipboardList, Bus, Loader2, Cloud, RefreshCw, DollarSign, Server, FileClock, Map, Download } from 'lucide-react';
 import { AutoPart, Tab, UserRole, Order, OrderStatus, OrderItem, User, MaintenanceRecord, VehicleInfo, MaintenanceSystem, SaleRecord, SystemLog, AssemblyDiagram } from './types';
 import { api } from './services/api';
 
@@ -17,7 +15,7 @@ import { FleetManagement } from './components/FleetManagement';
 import { SystemControl } from './components/SystemControl';
 import { CatalogManagement } from './components/CatalogManagement';
 import { SystemHistory } from './components/SystemHistory'; 
-import { DiagramEditor } from './components/DiagramEditor'; // Nova importação
+import { DiagramEditor } from './components/DiagramEditor';
 import { showNotification, ToastContainer } from './components/Toast';
 
 export default function App() {
@@ -36,7 +34,7 @@ export default function App() {
   const [vehicles, setVehicles] = useState<VehicleInfo[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [logs, setLogs] = useState<SystemLog[]>([]); 
-  const [diagrams, setDiagrams] = useState<AssemblyDiagram[]>([]); // Novo estado para diagramas
+  const [diagrams, setDiagrams] = useState<AssemblyDiagram[]>([]);
   
   // Dynamic Configs
   const [catalogConfig, setCatalogConfig] = useState({ customBrands: [] as string[], customCategories: [] as string[], vehicleModels: [] as string[] });
@@ -71,7 +69,7 @@ export default function App() {
         api.sales.list(),
         api.catalog.getConfig(),
         api.logs.list(),
-        api.diagrams.list() // Load diagrams
+        api.diagrams.list()
       ]);
       setParts(p);
       setOrders(o);
@@ -100,7 +98,6 @@ export default function App() {
 
     const channel = new BroadcastChannel('autoparts_cloud_sync');
     channel.onmessage = (event) => {
-      console.log('☁️ Cloud update received (Broadcast):', event.data.type);
       if (event.data.type === 'SYSTEM_LOCKDOWN') {
           checkMaintenance();
       }
@@ -109,14 +106,12 @@ export default function App() {
 
     const handleStorageChange = (event: StorageEvent) => {
        if (event.key && event.key.startsWith('autoparts_')) {
-          console.log('☁️ Cloud update received (Storage):', event.key);
           if (isAuthenticated) loadCloudData(true);
        }
     };
     
     const handleFocus = () => {
       if (isAuthenticated) {
-          console.log('🔄 Tab focused, syncing...');
           loadCloudData(true);
       }
     };
@@ -130,6 +125,19 @@ export default function App() {
       });
     };
     
+    // Configuração de Atualizações Automáticas (Electron)
+    if ((window as any).electronAPI) {
+      (window as any).electronAPI.onUpdateAvailable(() => {
+        showNotification('Nova atualização disponível. Baixando em segundo plano...', 'info');
+      });
+
+      (window as any).electronAPI.onUpdateDownloaded(() => {
+        if (confirm('Nova atualização baixada. Deseja reiniciar agora para instalar?')) {
+          (window as any).electronAPI.restartApp();
+        }
+      });
+    }
+
     const maintenanceInterval = setInterval(checkMaintenance, 5000); 
 
     window.addEventListener('storage', handleStorageChange);
@@ -202,7 +210,7 @@ export default function App() {
     }
   };
 
-  // --- CRUD Operations (Wrapped in API calls) ---
+  // --- CRUD Operations ---
   const handleAddUser = async (userData: Omit<User, 'id'>) => {
     setIsLoading(true);
     const newUser: User = { ...userData, id: Math.random().toString(36).substr(2, 9) };
@@ -459,7 +467,7 @@ export default function App() {
   const stockNavItems = [
     { id: 'list', label: 'Controle de Estoque', icon: <Package className="w-5 h-5" /> },
     { id: 'register', label: 'Cadastro de Item', icon: <PlusCircle className="w-5 h-5" /> },
-    { id: 'diagrams', label: 'Vistas Explodidas', icon: <Map className="w-5 h-5" /> }, // Nova Aba
+    { id: 'diagrams', label: 'Vistas Explodidas', icon: <Map className="w-5 h-5" /> },
     { id: 'catalog', label: 'Gestão de Marcas', icon: <Wrench className="w-5 h-5" /> },
     { id: 'fleet', label: 'Gestão de Frota', icon: <Bus className="w-5 h-5" /> },
     { id: 'history', label: 'Histórico de Frota', icon: <ClipboardList className="w-5 h-5" /> },
@@ -663,7 +671,7 @@ export default function App() {
                 onRequestRegistration={handleRequestRegistration}
                 onReportCorrection={handleReportCorrection}
                 vehiclesDB={vehicles}
-                diagrams={diagrams} // Passar diagramas
+                diagrams={diagrams}
               />
             )}
             

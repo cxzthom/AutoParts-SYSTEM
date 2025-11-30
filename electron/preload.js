@@ -1,8 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Expõe APIs seguras para o Frontend (React)
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Exemplo: Função para obter versão do app
   getAppVersion: () => process.versions.electron,
-  // Aqui você pode adicionar funções para salvar arquivos locais se quiser sair do Google Drive no futuro
+  
+  // Update Listeners
+  onUpdateAvailable: (callback) => ipcRenderer.on('update_available', callback),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update_downloaded', callback),
+  onDownloadProgress: (callback) => ipcRenderer.on('download_progress', (_event, value) => callback(value)),
+  
+  // Actions
+  restartApp: () => ipcRenderer.send('restart_app')
 });
