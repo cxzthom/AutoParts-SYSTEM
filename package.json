@@ -1,7 +1,7 @@
 {
   "name": "autoparts-erp-mobile",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.5",
   "main": "electron/main.js",
   "description": "Sistema ERP para Gestão de Autopeças (Desktop & Mobile)",
   "author": "AutoParts IT",
