@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Package, PlusCircle, Menu, X, Car, LogOut, ShoppingCart, UserCircle, Wrench, Users, ShieldCheck, ClipboardList, Bus, Loader2, Cloud, RefreshCw, DollarSign, Server, FileClock, Map, Download } from 'lucide-react';
 import { AutoPart, Tab, UserRole, Order, OrderStatus, OrderItem, User, MaintenanceRecord, VehicleInfo, MaintenanceSystem, SaleRecord, SystemLog, AssemblyDiagram } from './types';
 import { api } from './services/api';
@@ -47,6 +47,9 @@ export default function App() {
   // State para preencher o formulário quando vindo de uma solicitação
   const [registrationPrefill, setRegistrationPrefill] = useState<{description: string} | undefined>(undefined);
 
+  // Ref para armazenar o estado anterior dos pedidos e comparar mudanças
+  const prevOrdersRef = useRef<Order[]>([]);
+
   // Centralized Data Fetching
   const loadCloudData = useCallback(async (silent = false) => {
     if (!currentRole) return; 
@@ -72,7 +75,31 @@ export default function App() {
         api.diagrams.list()
       ]);
       setParts(p);
+      
+      // Lógica de Notificação de Mudança de Status
+      if (prevOrdersRef.current.length > 0 && currentUser) {
+        o.forEach(newOrder => {
+          const oldOrder = prevOrdersRef.current.find(old => old.id === newOrder.id);
+          
+          if (oldOrder && oldOrder.status !== newOrder.status) {
+            const isMyOrder = newOrder.requesterId === currentUser.id;
+            
+            if (isMyOrder) {
+               if (newOrder.status === OrderStatus.DELIVERED) {
+                 showNotification(`✅ Pedido #${newOrder.id} disponível no estoque!`, 'success');
+               } else if (newOrder.status === OrderStatus.CANCELED) {
+                 showNotification(`❌ Pedido #${newOrder.id} foi cancelado/recusado.`, 'error');
+               } else if (newOrder.status === OrderStatus.QUOTING) {
+                 showNotification(`📋 Pedido #${newOrder.id} entrou em processo de compra.`, 'info');
+               }
+            }
+          }
+        });
+      }
+
+      prevOrdersRef.current = o;
       setOrders(o);
+      
       setUsers(u);
       setVehicles(v);
       setMaintenanceRecords(r);
@@ -86,7 +113,7 @@ export default function App() {
       if (!silent) setIsLoading(false);
       setIsSyncing(false);
     }
-  }, [currentRole, isAuthenticated]);
+  }, [currentRole, isAuthenticated, currentUser]);
 
   // Initial Data Fetch & Live Sync Subscription
   useEffect(() => {
@@ -117,7 +144,8 @@ export default function App() {
     };
     
     const checkMaintenance = () => {
-      api.system.getSettings().then(settings => {
+      // FORCE REFRESH: Passa true para garantir que estamos vendo o status REAL da nuvem
+      api.system.getSettings(true).then(settings => {
            if (settings.maintenanceMode && currentRole !== UserRole.ADMIN && isAuthenticated) {
              handleLogout();
              alert("O sistema entrou em modo de manutenção. Você foi desconectado.");
@@ -198,6 +226,7 @@ export default function App() {
     setCurrentUser(null);
     setActiveTab('list');
     setRegistrationPrefill(undefined);
+    prevOrdersRef.current = [];
   };
 
   const handleSelectPortal = (role: 'STOCK' | 'PURCHASING' | 'MECHANIC' | 'ADMIN' | 'SALES') => {

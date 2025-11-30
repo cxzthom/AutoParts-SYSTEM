@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { AutoPart, PartStatus, PartCategory, OrderItem, VehicleInfo, MaintenanceSystem, POPULAR_BRANDS, Order, OrderStatus } from '../types';
-import { Search, Trash2, Edit2, Filter, Calendar, Tag, Barcode, CheckSquare, Square, FileText, ZoomIn, ZoomOut, X, ShoppingCart, CheckCircle2, ImageOff, AlertTriangle, Bus, Wrench, Cog, PlusCircle, HelpCircle, ArrowRight, Inbox, PackageCheck, Forward, Eye, FileWarning, ExternalLink, Plus } from 'lucide-react';
+import { Search, Trash2, Edit2, Filter, Calendar, Tag, Barcode, CheckSquare, Square, FileText, ZoomIn, ZoomOut, X, ShoppingCart, CheckCircle2, ImageOff, AlertTriangle, Bus, Wrench, Cog, PlusCircle, HelpCircle, ArrowRight, Inbox, PackageCheck, Forward, Eye, FileWarning, ExternalLink, Plus, Maximize2, Move, RotateCcw } from 'lucide-react';
 import { Button } from './Button';
 import { Input } from './Input';
 
@@ -90,6 +90,13 @@ export const ClientList: React.FC<ClientListProps> = ({
   const [viewingManualPart, setViewingManualPart] = useState<AutoPart | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
 
+  // --- NOVO: Visualizador de Imagem Expandida (Zoom & Pan) ---
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  const [imgZoom, setImgZoom] = useState(1);
+  const [imgPos, setImgPos] = useState({ x: 0, y: 0 });
+  const [isImgDragging, setIsImgDragging] = useState(false);
+  const [imgDragStart, setImgDragStart] = useState({ x: 0, y: 0 });
+  
   // Combine static and custom data
   const availableBrands = useMemo(() => [...POPULAR_BRANDS, ...customBrands], [customBrands]);
   const availableCategories = useMemo(() => [...Object.values(PartCategory), ...customCategories], [customCategories]);
@@ -120,6 +127,48 @@ export const ClientList: React.FC<ClientListProps> = ({
       return matchesSearch && matchesStatus && matchesCategory && matchesDate && matchesBrand;
     });
   }, [parts, searchTerm, filterStatus, filterCategory, filterBrand, filterDate]);
+
+  // --- Handlers de Imagem (Zoom/Pan) ---
+  const openImage = (url: string) => {
+    setExpandedImage(url);
+    setImgZoom(1);
+    setImgPos({ x: 0, y: 0 });
+  };
+
+  const closeImage = () => {
+    setExpandedImage(null);
+  };
+
+  const handleImageWheel = (e: React.WheelEvent) => {
+    e.stopPropagation();
+    const delta = e.deltaY * -0.001;
+    setImgZoom(prev => Math.min(Math.max(0.5, prev + delta), 5));
+  };
+
+  const handleImageMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsImgDragging(true);
+    setImgDragStart({ x: e.clientX - imgPos.x, y: e.clientY - imgPos.y });
+  };
+
+  const handleImageMouseMove = (e: React.MouseEvent) => {
+    if (isImgDragging) {
+      e.preventDefault();
+      setImgPos({
+        x: e.clientX - imgDragStart.x,
+        y: e.clientY - imgDragStart.y
+      });
+    }
+  };
+
+  const handleImageMouseUp = () => {
+    setIsImgDragging(false);
+  };
+
+  const resetImageTransform = () => {
+    setImgZoom(1);
+    setImgPos({ x: 0, y: 0 });
+  };
 
   // --- Handlers de Seleção ---
   const toggleSelection = (id: string) => {
@@ -525,6 +574,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                   <div 
                     onClick={() => toggleSelection(part.id)}
                     className="absolute top-0 left-0 bottom-0 w-12 cursor-pointer z-20 flex items-center justify-center hover:bg-gray-50 transition-colors border-r border-transparent group-hover:border-gray-100"
+                    title={isSelected ? "Deselecionar item" : "Selecionar item"}
                   >
                     {isSelected ? (
                       <CheckSquare className="w-5 h-5 text-red-600" />
@@ -536,15 +586,24 @@ export const ClientList: React.FC<ClientListProps> = ({
 
                 <div className={`${viewOnly ? 'pl-0' : 'pl-10'} flex flex-col md:flex-row justify-between gap-6 relative z-10`}>
                   
-                  {/* Image Thumbnail */}
+                  {/* Image Thumbnail with Overlay */}
                   <div className="flex-shrink-0 md:self-start">
-                    <div className="w-full md:w-32 h-32 rounded bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center">
+                    <div 
+                      className="w-full md:w-32 h-32 rounded bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center relative cursor-zoom-in group/image"
+                      onClick={() => part.imageUrl && openImage(part.imageUrl)}
+                      title="Clique para ampliar a imagem"
+                    >
                       {part.imageUrl ? (
-                        <img 
-                          src={part.imageUrl} 
-                          alt={part.name} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                        />
+                        <>
+                          <img 
+                            src={part.imageUrl} 
+                            alt={part.name} 
+                            className="w-full h-full object-cover transition-transform duration-300" 
+                          />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/image:opacity-100 transition-opacity">
+                             <Maximize2 className="w-8 h-8 text-white" />
+                          </div>
+                        </>
                       ) : (
                         <ImageOff className="w-8 h-8 text-gray-300" />
                       )}
@@ -624,6 +683,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                         }}
                         className="w-full text-xs border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
                         icon={<FileText className="w-3.5 h-3.5" />}
+                        title="Ver manual técnico ou datasheet"
                       >
                         {part.manualUrl ? 'Abrir Manual' : 'Datasheet'}
                       </Button>
@@ -636,6 +696,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                           onClick={() => openReportModal(part)}
                           className="w-full text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border border-transparent hover:border-red-100"
                           icon={<FileWarning className="w-3.5 h-3.5" />}
+                          title="Reportar problema no cadastro"
                         >
                           Reportar Erro
                         </Button>
@@ -648,6 +709,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                           onClick={() => onAddToCart(part)}
                           className="w-full bg-green-600 hover:bg-green-700 text-white border-none mt-auto"
                           icon={<Plus className="w-4 h-4" />}
+                          title="Adicionar item à venda atual"
                         >
                           Vender
                         </Button>
@@ -655,10 +717,10 @@ export const ClientList: React.FC<ClientListProps> = ({
 
                       {canEdit && !viewOnly && !showPrice && (
                         <div className="flex gap-2 w-full mt-auto">
-                          <Button variant="ghost" className="flex-1 text-gray-500 border border-gray-200 rounded" title="Editar">
+                          <Button variant="ghost" className="flex-1 text-gray-500 border border-gray-200 rounded" title="Editar informações da peça">
                             <Edit2 className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 border border-gray-200 rounded" onClick={() => onDelete(part.id)} title="Excluir">
+                          <Button variant="ghost" className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 border border-gray-200 rounded" onClick={() => onDelete(part.id)} title="Remover peça do estoque">
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
@@ -837,6 +899,101 @@ export const ClientList: React.FC<ClientListProps> = ({
            </div>
          </div>
       )}
+
+      {/* Reporte de Erro Modal */}
+      {isReportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+           <div className="bg-white w-full max-w-lg rounded shadow-2xl p-6 border-l-4 border-red-600">
+             <div className="flex justify-between items-center mb-4 border-b border-gray-200 pb-2">
+                <div>
+                   <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">Reportar Inconsistência</h3>
+                   <p className="text-xs text-gray-500">Notificar o almoxarifado sobre erros neste cadastro.</p>
+                </div>
+                <button onClick={() => setIsReportModalOpen(false)}><X className="w-5 h-5 text-gray-400" /></button>
+             </div>
+             <div className="mb-4 bg-gray-50 p-3 rounded text-sm">
+                <span className="font-bold block text-gray-700">Peça: {reportPart?.name}</span>
+                <span className="font-mono text-gray-500 text-xs">SKU: {reportPart?.internalCode}</span>
+             </div>
+             <textarea 
+               className="w-full border border-gray-300 rounded p-3 text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-600 outline-none" 
+               rows={4} 
+               placeholder="Descreva o erro (Ex: Foto incorreta, código OEM errado, descrição incompleta...)" 
+               value={reportNotes} 
+               onChange={(e) => setReportNotes(e.target.value)} 
+             />
+             <div className="flex justify-end gap-3 mt-4">
+                <Button variant="secondary" onClick={() => setIsReportModalOpen(false)}>Cancelar</Button>
+                <Button onClick={handleSubmitReport} className="bg-red-600 hover:bg-red-700 border-red-600">Enviar Reporte</Button>
+             </div>
+           </div>
+        </div>
+      )}
+
+      {/* --- Visualizador de Imagem Expandida (Interactive Zoom & Pan) --- */}
+      {expandedImage && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in">
+          <div className="w-full h-full flex flex-col relative overflow-hidden">
+            
+            {/* Header / Controls */}
+            <div className="absolute top-0 left-0 right-0 p-4 z-50 flex justify-between items-start pointer-events-none">
+               <div className="bg-white/10 backdrop-blur p-2 rounded-lg text-white pointer-events-auto flex gap-2 shadow-lg border border-white/20">
+                  <button onClick={() => handleImageWheel({ deltaY: 1000 } as any)} className="p-2 hover:bg-white/20 rounded" title="Reduzir Zoom (-)">
+                    <ZoomOut className="w-5 h-5" />
+                  </button>
+                  <span className="flex items-center justify-center w-12 font-mono text-sm font-bold border-x border-white/20">
+                    {Math.round(imgZoom * 100)}%
+                  </span>
+                  <button onClick={() => handleImageWheel({ deltaY: -1000 } as any)} className="p-2 hover:bg-white/20 rounded" title="Aumentar Zoom (+)">
+                    <ZoomIn className="w-5 h-5" />
+                  </button>
+                  <div className="w-px bg-white/20 mx-1"></div>
+                  <button onClick={resetImageTransform} className="p-2 hover:bg-white/20 rounded" title="Resetar Visualização">
+                    <RotateCcw className="w-5 h-5" />
+                  </button>
+               </div>
+               
+               <button 
+                 onClick={closeImage} 
+                 className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg pointer-events-auto transition-transform hover:scale-110"
+                 title="Fechar (Esc)"
+               >
+                 <X className="w-6 h-6" />
+               </button>
+            </div>
+
+            {/* Hint Overlay */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur px-4 py-2 rounded-full text-white text-xs font-bold pointer-events-none z-50 border border-white/10 flex items-center gap-2">
+               <Move className="w-4 h-4" />
+               <span>Clique e arraste para mover • Scroll para zoom</span>
+            </div>
+
+            {/* Image Canvas */}
+            <div 
+              className="flex-1 flex items-center justify-center overflow-hidden cursor-move select-none"
+              onWheel={handleImageWheel}
+              onMouseDown={handleImageMouseDown}
+              onMouseMove={handleImageMouseMove}
+              onMouseUp={handleImageMouseUp}
+              onMouseLeave={handleImageMouseUp}
+              title="Clique e arraste para mover a imagem"
+            >
+               <img 
+                 src={expandedImage} 
+                 alt="Expanded View" 
+                 className="max-w-none transition-transform duration-75 ease-linear origin-center shadow-2xl"
+                 style={{ 
+                   transform: `translate(${imgPos.x}px, ${imgPos.y}px) scale(${imgZoom})`,
+                   maxHeight: '90vh',
+                   maxWidth: '90vw'
+                 }}
+                 draggable={false}
+               />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

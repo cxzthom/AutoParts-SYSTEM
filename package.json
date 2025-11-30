@@ -25,7 +25,7 @@
   "dependencies": {
     "@capacitor/android": "^5.7.0",
     "@capacitor/core": "^5.7.0",
-    "@google/genai": "^0.1.1",
+    "@google/genai": "^1.0.0",
     "electron-updater": "^6.1.8",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
