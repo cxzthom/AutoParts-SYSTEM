@@ -317,6 +317,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                        onClick={() => onOrderAction && onOrderAction(req.id, 'RESOLVE_CORRECTION')}
                        className="bg-red-100 hover:bg-red-200 text-red-800 border-red-200 text-xs"
                        icon={<CheckCircle2 className="w-3 h-3" />}
+                       title="Marcar inconsistência como resolvida e arquivar"
                      >
                        Marcar como Resolvido
                      </Button>
@@ -377,6 +378,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                         onClick={() => onOrderAction && onOrderAction(order.id, 'DELIVER')}
                         className="w-full bg-green-600 hover:bg-green-700 border-green-600 text-xs"
                         icon={<CheckCircle2 className="w-3 h-3" />}
+                        title="Confirmar entrega da peça e baixar do estoque"
                       >
                         Atender (Estoque)
                       </Button>
@@ -386,6 +388,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                         onClick={() => onOrderAction && onOrderAction(order.id, 'FORWARD_PURCHASING')}
                         className="w-full text-xs"
                         icon={<Forward className="w-3 h-3" />}
+                        title="Peça indisponível. Enviar para cotação de compra"
                       >
                         Enviar p/ Compras
                       </Button>
@@ -430,6 +433,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                        onClick={() => onProcessRequest && onProcessRequest(req)}
                        className="w-full bg-purple-600 hover:bg-purple-700 border-purple-600 text-xs"
                        icon={<ArrowRight className="w-3 h-3" />}
+                       title="Iniciar cadastro com dados pré-preenchidos"
                      >
                        Cadastrar Agora
                      </Button>
@@ -449,6 +453,7 @@ export const ClientList: React.FC<ClientListProps> = ({
               ? 'bg-gray-900 text-white border-gray-900 shadow-md' 
               : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
           }`}
+          title="Exibir todas as marcas"
         >
           Todas as Marcas
         </button>
@@ -461,6 +466,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                 ? 'bg-red-600 text-white border-red-600 shadow-md' 
                 : 'bg-white text-gray-600 border-gray-300 hover:border-red-300 hover:text-red-600'
             }`}
+            title={`Filtrar por ${brand}`}
           >
             {brand === 'Mercedes-Benz' && <span className="font-serif">MB</span>}
             {brand}
@@ -483,6 +489,7 @@ export const ClientList: React.FC<ClientListProps> = ({
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600"
+            title="Digite para pesquisar no catálogo"
           />
         </div>
         
@@ -495,6 +502,7 @@ export const ClientList: React.FC<ClientListProps> = ({
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20"
+              title="Filtrar por sistema ou categoria"
             >
               <option value="ALL">Todas</option>
               {availableCategories.map(c => (
@@ -511,6 +519,7 @@ export const ClientList: React.FC<ClientListProps> = ({
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20"
+              title="Filtrar por disponibilidade"
             >
               <option value="ALL">Todos</option>
               {Object.values(PartStatus).map(s => (
@@ -528,6 +537,7 @@ export const ClientList: React.FC<ClientListProps> = ({
               value={filterDate}
               onChange={(e) => setFilterDate(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20"
+              title="Filtrar por data de criação"
             />
           </div>
 
@@ -539,6 +549,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                 onClick={() => setIsRequestPartModalOpen(true)}
                 className="w-full border-dashed border-red-300 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-400"
                 icon={<HelpCircle className="w-4 h-4"/>}
+                title="Abrir formulário de solicitação de peça nova"
               >
                 Não encontrou? Solicitar Cadastro
               </Button>
@@ -556,6 +567,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                <Button 
                 onClick={() => setIsRequestPartModalOpen(true)}
                 icon={<PlusCircle className="w-4 h-4"/>}
+                title="Abrir formulário de solicitação de peça nova"
               >
                 Solicitar Cadastro de Peça Nova
               </Button>
@@ -747,12 +759,13 @@ export const ClientList: React.FC<ClientListProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-gray-800" onClick={clearSelection}>Cancelar</Button>
+              <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-gray-800" onClick={clearSelection} title="Limpar seleção atual">Cancelar</Button>
               <Button 
                 variant="primary"
                 onClick={() => setIsOrderModalOpen(true)}
                 icon={<ShoppingCart className="w-4 h-4" />}
                 className="bg-white text-gray-900 hover:bg-gray-100 border-none font-bold"
+                title="Revisar e confirmar o pedido"
               >
                 Revisar {canEdit ? 'Pedido' : 'Solicitação'}
               </Button>
@@ -782,13 +795,13 @@ export const ClientList: React.FC<ClientListProps> = ({
               <div className="flex items-center gap-2">
                  {!viewingManualPart.manualUrl?.includes('.pdf') && (
                    <>
-                    <button onClick={() => setZoomLevel(z => Math.max(0.5, z - 0.25))} className="p-1.5 hover:bg-gray-200 rounded border border-gray-300 bg-white"><ZoomOut className="w-4 h-4" /></button>
+                    <button onClick={() => setZoomLevel(z => Math.max(0.5, z - 0.25))} className="p-1.5 hover:bg-gray-200 rounded border border-gray-300 bg-white" title="Diminuir Zoom"><ZoomOut className="w-4 h-4" /></button>
                     <span className="text-xs font-mono w-12 text-center font-bold text-gray-600">{Math.round(zoomLevel * 100)}%</span>
-                    <button onClick={() => setZoomLevel(z => Math.min(3, z + 0.25))} className="p-1.5 hover:bg-gray-200 rounded border border-gray-300 bg-white"><ZoomIn className="w-4 h-4" /></button>
+                    <button onClick={() => setZoomLevel(z => Math.min(3, z + 0.25))} className="p-1.5 hover:bg-gray-200 rounded border border-gray-300 bg-white" title="Aumentar Zoom"><ZoomIn className="w-4 h-4" /></button>
                     <div className="h-6 w-px bg-gray-300 mx-2"></div>
                    </>
                  )}
-                <button onClick={() => setViewingManualPart(null)} className="p-2 hover:bg-red-600 hover:text-white rounded"><X className="w-5 h-5" /></button>
+                <button onClick={() => setViewingManualPart(null)} className="p-2 hover:bg-red-600 hover:text-white rounded" title="Fechar visualizador"><X className="w-5 h-5" /></button>
               </div>
             </div>
 
@@ -867,8 +880,8 @@ export const ClientList: React.FC<ClientListProps> = ({
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                           <input type="number" min="1" value={quantities[part.id] || 1} onChange={(e) => updateQuantity(part.id, parseInt(e.target.value))} className="w-16 px-2 py-1 text-xs border border-gray-300 rounded text-center" />
-                           <button onClick={() => toggleSelection(part.id)} className="text-gray-400 hover:text-red-600 p-1"><Trash2 className="w-4 h-4" /></button>
+                           <input title="Definir quantidade" type="number" min="1" value={quantities[part.id] || 1} onChange={(e) => updateQuantity(part.id, parseInt(e.target.value))} className="w-16 px-2 py-1 text-xs border border-gray-300 rounded text-center" />
+                           <button title="Remover item da lista" onClick={() => toggleSelection(part.id)} className="text-gray-400 hover:text-red-600 p-1"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       </div>
                     ))}

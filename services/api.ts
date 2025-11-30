@@ -42,9 +42,14 @@ const db = {
     if (globalCache && !force) return globalCache;
 
     try {
-      // Tenta conectar à Nuvem
-      const res = await fetch(GOOGLE_SCRIPT_URL);
-      if (!res.ok) throw new Error("Erro na resposta do servidor");
+      // Tenta conectar à Nuvem com configurações otimizadas para evitar CORS Errors
+      const res = await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'GET',
+        redirect: 'follow',
+        credentials: 'omit' // Importante para evitar conflitos de cookie com contas Google logadas
+      });
+      
+      if (!res.ok) throw new Error(`Erro na resposta do servidor: ${res.status}`);
       
       const data = await res.json();
       globalCache = data; // Atualiza a RAM com o dado fresco
@@ -53,7 +58,7 @@ const db = {
       console.error("ERRO CRÍTICO: Falha ao conectar com Google Drive:", e);
       // Se falhar e tivermos cache, usamos o cache para não travar o app (fallback)
       if (globalCache) return globalCache;
-      throw new Error("SEM CONEXÃO: O sistema exige internet para acessar o banco de dados seguro.");
+      throw new Error("SEM CONEXÃO: O sistema exige internet para acessar o banco de dados seguro. Verifique sua conexão.");
     }
   },
 
@@ -71,8 +76,14 @@ const db = {
 
     // 2. Envia para o Google Drive
     try {
+      // POST como 'text/plain' evita Preflight OPTIONS request que o Google Apps Script não suporta bem
       await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
+        redirect: 'follow',
+        credentials: 'omit',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
         body: JSON.stringify(globalCache),
       });
     } catch (e) {
