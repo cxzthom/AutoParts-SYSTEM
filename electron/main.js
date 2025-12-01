@@ -42,10 +42,19 @@ function createWindow() {
   // Check for updates once the window is ready
   mainWindow.once('ready-to-show', () => {
     if (process.env.NODE_ENV !== 'development') {
-      autoUpdater.checkForUpdatesAndNotify();
+      try {
+        autoUpdater.checkForUpdatesAndNotify();
+      } catch (err) {
+        console.error('Update check failed:', err);
+      }
     }
   });
 }
+
+// --- IPC Handlers ---
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
 
 // --- Auto Updater Events ---
 autoUpdater.on('update-available', () => {

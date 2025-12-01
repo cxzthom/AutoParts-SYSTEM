@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Package, PlusCircle, Menu, X, Car, LogOut, ShoppingCart, UserCircle, Wrench, Users, ShieldCheck, ClipboardList, Bus, Loader2, Cloud, RefreshCw, DollarSign, Server, FileClock, Map, Download } from 'lucide-react';
 import { AutoPart, Tab, UserRole, Order, OrderStatus, OrderItem, User, MaintenanceRecord, VehicleInfo, MaintenanceSystem, SaleRecord, SystemLog, AssemblyDiagram } from './types';
@@ -17,6 +18,20 @@ import { CatalogManagement } from './components/CatalogManagement';
 import { SystemHistory } from './components/SystemHistory'; 
 import { DiagramEditor } from './components/DiagramEditor';
 import { showNotification, ToastContainer } from './components/Toast';
+import { SplashScreen } from './components/SplashScreen';
+
+// SemVer comparison function
+function compareVersions(v1: string, v2: string) {
+  const p1 = v1.split('.').map(Number);
+  const p2 = v2.split('.').map(Number);
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const n1 = p1[i] || 0;
+    const n2 = p2[i] || 0;
+    if (n1 > n2) return 1;
+    if (n1 < n2) return -1;
+  }
+  return 0;
+}
 
 export default function App() {
   // Navigation & Auth State
@@ -44,8 +59,13 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
+  // Version Control
+  const [isAppOutdated, setIsAppOutdated] = useState(false);
+
   // State para preencher o formulário quando vindo de uma solicitação
   const [registrationPrefill, setRegistrationPrefill] = useState<{description: string} | undefined>(undefined);
+  // State for editing part
+  const [editingPart, setEditingPart] = useState<AutoPart | undefined>(undefined);
 
   // Ref para armazenar o estado anterior dos pedidos e comparar mudanças
   const prevOrdersRef = useRef<Order[]>([]);
@@ -117,11 +137,42 @@ export default function App() {
 
   // Initial Data Fetch & Live Sync Subscription
   useEffect(() => {
-    if (isAuthenticated) {
-        loadCloudData().catch(e => console.error("Initial load failed", e));
-    } else {
-        setIsInitialLoad(false);
-    }
+    // Artificial delay for splash screen aesthetics (min 2 seconds)
+    const minSplashTime = new Promise(resolve => setTimeout(resolve, 2500));
+    
+    const init = async () => {
+      // Check Version first
+      try {
+        const settings = await api.system.getSettings(true);
+        if (settings.minAppVersion && (window as any).electronAPI) {
+          const currentVersion = await (window as any).electronAPI.getAppVersion();
+          console.log(`Current App Ver: ${currentVersion}, Min Required: ${settings.minAppVersion}`);
+          if (compareVersions(currentVersion, settings.minAppVersion) < 0) {
+            setIsAppOutdated(true);
+            setIsInitialLoad(false);
+            return; // Stop loading if outdated
+          }
+        }
+      } catch (err) {
+        console.warn("Version check failed, proceeding...", err);
+      }
+
+      if (isAuthenticated) {
+         try {
+           await Promise.all([loadCloudData(), minSplashTime]);
+         } catch (e) {
+           console.error("Initial load failed", e);
+         }
+      } else {
+         await minSplashTime;
+      }
+      setIsInitialLoad(false);
+    };
+
+    init().catch(err => {
+      console.error("Critical Init Error:", err);
+      setIsInitialLoad(false);
+    });
 
     const channel = new BroadcastChannel('autoparts_cloud_sync');
     channel.onmessage = (event) => {
@@ -146,6 +197,16 @@ export default function App() {
     const checkMaintenance = () => {
       // FORCE REFRESH: Passa true para garantir que estamos vendo o status REAL da nuvem
       api.system.getSettings(true).then(settings => {
+           // Também verifica versão durante o uso
+           if (settings.minAppVersion && (window as any).electronAPI) {
+              (window as any).electronAPI.getAppVersion().then((v: string) => {
+                 if (compareVersions(v, settings.minAppVersion!) < 0) {
+                   setIsAppOutdated(true);
+                   handleLogout();
+                 }
+              });
+           }
+
            if (settings.maintenanceMode && currentRole !== UserRole.ADMIN && isAuthenticated) {
              handleLogout();
              alert("O sistema entrou em modo de manutenção. Você foi desconectado.");
@@ -168,6 +229,13 @@ export default function App() {
         }
       });
     }
+    
+    // Polling interval for auto-sync (7 seconds)
+    const syncInterval = setInterval(() => {
+       if (isAuthenticated) {
+          loadCloudData(true);
+       }
+    }, 7000);
 
     const maintenanceInterval = setInterval(checkMaintenance, 5000); 
 
@@ -196,6 +264,7 @@ export default function App() {
       window.removeEventListener('keypress', resetIdle);
       clearTimeout(idleTimer);
       clearInterval(maintenanceInterval);
+      clearInterval(syncInterval);
     };
   }, [isAuthenticated, loadCloudData, currentRole]);
 
@@ -229,6 +298,7 @@ export default function App() {
     setCurrentUser(null);
     setActiveTab('list');
     setRegistrationPrefill(undefined);
+    setEditingPart(undefined);
     prevOrdersRef.current = [];
   };
 
@@ -301,6 +371,16 @@ export default function App() {
     setActiveTab('list');
     setRegistrationPrefill(undefined);
     showNotification('Peça cadastrada no catálogo.', 'success');
+  };
+
+  const handleUpdatePart = async (id: string, data: Partial<AutoPart>) => {
+    setIsLoading(true);
+    await api.parts.update(id, data);
+    await loadCloudData(true);
+    setIsLoading(false);
+    setActiveTab('list');
+    setEditingPart(undefined);
+    showNotification('Peça atualizada com sucesso.', 'success');
   };
 
   const handleDeletePart = async (id: string) => {
@@ -478,13 +558,12 @@ export default function App() {
 
   // Render Flows
   if (isInitialLoad) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center text-white">
-        <Loader2 className="w-12 h-12 animate-spin text-red-600 mb-4" />
-        <h2 className="text-xl font-bold">AutoParts ERP</h2>
-        <p className="text-sm text-gray-400 mt-2">Conectando ao servidor em nuvem...</p>
-      </div>
-    );
+    return <SplashScreen />;
+  }
+
+  // FORCE UPDATE SCREEN
+  if (isAppOutdated) {
+    return <PortalSelection onSelectPortal={() => {}} isOutdated={true} />;
   }
 
   if (!currentRole) {
@@ -651,7 +730,7 @@ export default function App() {
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
               {activeTab === 'list' && 'Gestão de Estoque'}
               {activeTab === 'mechanic_dashboard' && 'Painel de Manutenção'}
-              {activeTab === 'register' && 'Novo Cadastro de Peça'}
+              {activeTab === 'register' && (editingPart ? 'Editar Peça' : 'Novo Cadastro de Peça')}
               {activeTab === 'orders' && 'Central de Compras & Vendas'}
               {activeTab === 'users' && 'Administração de Acessos (TI)'}
               {activeTab === 'history' && 'Histórico de Frota'}
@@ -682,6 +761,13 @@ export default function App() {
                 clients={parts} 
                 onDelete={handleDeletePart} 
                 onCreateOrder={handleCreateOrder}
+                onEdit={(partId) => {
+                  const partToEdit = parts.find(p => p.id === partId);
+                  if (partToEdit) {
+                    setEditingPart(partToEdit);
+                    setActiveTab('register');
+                  }
+                }}
                 canEdit={currentRole === UserRole.STOCK || currentRole === UserRole.ADMIN}
                 pendingRequests={orders.filter(o => o.status === OrderStatus.REGISTRATION_REQUEST)}
                 pendingOrders={orders.filter(o => o.status === OrderStatus.PENDING)}
@@ -709,12 +795,14 @@ export default function App() {
             
             {activeTab === 'register' && (currentRole === UserRole.STOCK || currentRole === UserRole.ADMIN) && (
               <ClientForm 
-                onSave={handleSavePart} 
+                onSave={editingPart ? (data) => handleUpdatePart(editingPart.id, data) : handleSavePart} 
                 onCancel={() => {
                   setActiveTab('list');
                   setRegistrationPrefill(undefined);
+                  setEditingPart(undefined);
                 }} 
                 initialData={registrationPrefill}
+                partData={editingPart}
                 customBrands={catalogConfig.customBrands}
                 customCategories={catalogConfig.customCategories}
               />

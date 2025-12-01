@@ -1,7 +1,7 @@
 {
   "name": "autoparts-erp-desktop",
   "private": true,
-  "version": "1.0.8",
+  "version": "1.0.20",
   "main": "electron/main.js",
   "description": "Sistema ERP para Gestão de Autopeças (Desktop Windows)",
   "author": "AutoParts IT",
@@ -70,8 +70,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "SEU_USUARIO_GITHUB",
-        "repo": "NOME_DO_REPO"
+        "owner": "cxzthom",
+        "repo": "AutoParts-SYSTEM"
       }
     ]
   }

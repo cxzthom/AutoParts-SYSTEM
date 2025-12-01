@@ -10,6 +10,7 @@ interface ClientFormProps {
   onSave: (part: Omit<AutoPart, 'id' | 'createdAt'>) => void;
   onCancel: () => void;
   initialData?: { description: string }; 
+  partData?: AutoPart;
   customBrands?: string[];
   customCategories?: string[];
 }
@@ -18,6 +19,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
   onSave, 
   onCancel, 
   initialData, 
+  partData,
   customBrands = [], 
   customCategories = [] 
 }) => {
@@ -44,13 +46,29 @@ export const ClientForm: React.FC<ClientFormProps> = ({
   const availableBrands = useMemo(() => [...POPULAR_BRANDS, ...customBrands], [customBrands]);
   const availableCategories = useMemo(() => [...Object.values(PartCategory), ...customCategories], [customCategories]);
 
-  // Efeito para preencher o prompt e disparar geração se houver dados iniciais
+  // Efeito para preencher o formulário se houver dados de edição ou prompt inicial
   useEffect(() => {
-    if (initialData?.description) {
+    if (partData) {
+        setFormData({
+            name: partData.name,
+            internalCode: partData.internalCode,
+            originalCode: partData.originalCode,
+            category: partData.category as PartCategory,
+            status: partData.status,
+            supplierName: partData.supplierName,
+            supplierDoc: partData.supplierDoc,
+            supplierEmail: partData.supplierEmail,
+            supplierPhone: partData.supplierPhone,
+            description: partData.description,
+            imageUrl: partData.imageUrl || '',
+            manualUrl: partData.manualUrl || '',
+            compatibleBrands: partData.compatibleBrands || []
+        });
+    } else if (initialData?.description) {
       const cleanDesc = initialData.description.replace('SOLICITAÇÃO DE PEÇA NOVA: ', '');
       setPrompt(cleanDesc);
     }
-  }, [initialData]);
+  }, [initialData, partData]);
 
   // --- Validação ---
   const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -410,7 +428,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
             Cancelar
           </Button>
           <Button type="submit" icon={<Save className="w-4 h-4"/>}>
-            Salvar Cadastro
+            {partData ? 'Salvar Alterações' : 'Salvar Cadastro'}
           </Button>
         </div>
       </form>

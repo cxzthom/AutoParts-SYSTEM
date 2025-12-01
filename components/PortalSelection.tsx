@@ -1,13 +1,14 @@
 
 import React, { useEffect, useState } from 'react';
-import { Package, ShoppingCart, ArrowRight, Wrench, ShieldCheck, Server, Lock } from 'lucide-react';
+import { Package, ShoppingCart, ArrowRight, Wrench, ShieldCheck, Server, Lock, AlertTriangle, Download } from 'lucide-react';
 import { api } from '../services/api';
 
 interface PortalSelectionProps {
   onSelectPortal: (role: 'STOCK' | 'PURCHASING' | 'MECHANIC' | 'ADMIN' | 'SALES') => void;
+  isOutdated?: boolean;
 }
 
-export const PortalSelection: React.FC<PortalSelectionProps> = ({ onSelectPortal }) => {
+export const PortalSelection: React.FC<PortalSelectionProps> = ({ onSelectPortal, isOutdated }) => {
   const [isMaintenance, setIsMaintenance] = useState(false);
 
   useEffect(() => {
@@ -21,6 +22,31 @@ export const PortalSelection: React.FC<PortalSelectionProps> = ({ onSelectPortal
     };
     return () => channel.close();
   }, []);
+
+  if (isOutdated) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-6 relative overflow-hidden text-center">
+         <div className="z-10 bg-white p-12 rounded-lg shadow-2xl max-w-2xl w-full border-t-8 border-orange-500">
+            <AlertTriangle className="w-24 h-24 text-orange-500 mx-auto mb-6" />
+            <h1 className="text-4xl font-extrabold text-gray-900 mb-4">ATUALIZAÇÃO OBRIGATÓRIA</h1>
+            <p className="text-gray-600 text-lg mb-8">
+              Sua versão do aplicativo está desatualizada e não pode acessar o sistema por motivos de segurança e compatibilidade de dados.
+            </p>
+            <div className="bg-orange-50 p-6 rounded border border-orange-200 mb-8">
+              <p className="text-orange-800 font-bold mb-2">Por favor, reinicie o aplicativo.</p>
+              <p className="text-sm text-orange-700">A atualização será baixada e instalada automaticamente ao reiniciar.</p>
+            </div>
+            
+            <button 
+               onClick={() => (window as any).electronAPI?.restartApp()}
+               className="inline-flex items-center gap-2 px-8 py-4 bg-orange-600 text-white rounded font-bold hover:bg-orange-700 transition-colors shadow-lg animate-pulse"
+             >
+               <Download className="w-5 h-5" /> REINICIAR E ATUALIZAR AGORA
+             </button>
+         </div>
+      </div>
+    );
+  }
 
   if (isMaintenance) {
     return (
@@ -39,13 +65,20 @@ export const PortalSelection: React.FC<PortalSelectionProps> = ({ onSelectPortal
             </div>
             
             <div className="border-t border-gray-200 pt-8">
-               <p className="text-xs text-gray-400 uppercase tracking-widest mb-4">Acesso Administrativo (TI)</p>
-               <button 
-                 onClick={() => onSelectPortal('ADMIN')}
-                 className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded font-bold hover:bg-gray-800 transition-colors"
-               >
-                 <ShieldCheck className="w-5 h-5" /> Login de Emergência
-               </button>
+               <div className="flex justify-center gap-4">
+                  <button 
+                   onClick={() => window.location.reload()}
+                   className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded font-bold hover:bg-gray-50 transition-colors"
+                  >
+                   Verificar Status
+                  </button>
+                 <button 
+                   onClick={() => onSelectPortal('ADMIN')}
+                   className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded font-bold hover:bg-gray-800 transition-colors"
+                 >
+                   <ShieldCheck className="w-5 h-5" /> Login de Emergência
+                 </button>
+               </div>
             </div>
          </div>
       </div>

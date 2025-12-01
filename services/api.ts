@@ -9,7 +9,7 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyUbiA8AtqgvM
 const LATENCY_MS = 0; 
 
 // --- MOCK CONSTANTS (Usadas apenas como valores iniciais padrão caso a nuvem esteja vazia) ---
-const MOCK_SETTINGS: SystemSettings = { maintenanceMode: false, lastUpdatedBy: 'System', lastUpdatedAt: new Date().toISOString() };
+const MOCK_SETTINGS: SystemSettings = { maintenanceMode: false, minAppVersion: '0.0.0', lastUpdatedBy: 'System', lastUpdatedAt: new Date().toISOString() };
 const MOCK_CATALOG_CONFIG: CatalogConfig = { customBrands: [], customCategories: [], vehicleModels: [] };
 const MOCK_VEHICLES_INITIAL: VehicleInfo[] = [];
 const MOCK_PARTS: AutoPart[] = [];
@@ -43,7 +43,8 @@ const db = {
 
     try {
       // Tenta conectar à Nuvem com configurações otimizadas para evitar CORS Errors
-      const res = await fetch(GOOGLE_SCRIPT_URL, {
+      // Adicionado cache busting via timestamp para evitar cache agressivo de redes/browsers
+      const res = await fetch(`${GOOGLE_SCRIPT_URL}?t=${Date.now()}`, {
         method: 'GET',
         redirect: 'follow',
         credentials: 'omit' // Importante para evitar conflitos de cookie com contas Google logadas
@@ -82,7 +83,7 @@ const db = {
         redirect: 'follow',
         credentials: 'omit',
         headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
+          'Content-Type': 'text/plain', // Simplificado para evitar CORS Preflight
         },
         body: JSON.stringify(globalCache),
       });
@@ -139,7 +140,7 @@ export const api = {
        const updated = { ...current, ...settings, lastUpdatedAt: new Date().toISOString() };
        await db.set('settings', updated);
        
-       createLog('SYSTEM', 'SYSTEM', `Configurações de sistema alteradas`, `Manutenção: ${updated.maintenanceMode}`);
+       createLog('SYSTEM', 'SYSTEM', `Configurações de sistema alteradas`, `Manutenção: ${updated.maintenanceMode} | MinVer: ${updated.minAppVersion}`);
        notifyUpdate('SYSTEM_LOCKDOWN');
        return updated;
     }

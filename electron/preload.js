@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  getAppVersion: () => process.versions.electron,
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   
   // Update Listeners
   onUpdateAvailable: (callback) => ipcRenderer.on('update_available', callback),

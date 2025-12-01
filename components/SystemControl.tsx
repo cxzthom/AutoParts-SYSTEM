@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { SystemSettings, UserRole } from '../types';
 import { api } from '../services/api';
 import { Button } from './Button';
-import { ShieldAlert, Lock, Unlock, Power, Server, Activity, RefreshCw } from 'lucide-react';
+import { Input } from './Input';
+import { ShieldAlert, Lock, Unlock, Power, Server, Activity, RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface SystemControlProps {
   currentUserRole: UserRole;
@@ -13,9 +14,11 @@ interface SystemControlProps {
 export const SystemControl: React.FC<SystemControlProps> = ({ currentUserRole, onNotify }) => {
   const [settings, setSettings] = useState<SystemSettings>({
     maintenanceMode: false,
+    minAppVersion: '1.0.0',
     lastUpdatedBy: '-',
     lastUpdatedAt: '-'
   });
+  const [minVersionInput, setMinVersionInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -23,29 +26,57 @@ export const SystemControl: React.FC<SystemControlProps> = ({ currentUserRole, o
   }, []);
 
   const loadSettings = async () => {
-    const data = await api.system.getSettings();
+    // Force refresh = true para garantir que o Admin veja o estado REAL da nuvem
+    const data = await api.system.getSettings(true);
     setSettings(data);
+    setMinVersionInput(data.minAppVersion || '1.0.0');
   };
 
   const toggleMaintenance = async () => {
-    if (settings.maintenanceMode) {
-       // Turning OFF
-       if (confirm("Deseja DESATIVAR o modo de manutenção? O acesso será liberado para todos os usuários.")) {
-          setIsLoading(true);
-          await api.system.updateSettings({ maintenanceMode: false, lastUpdatedBy: 'Admin' });
-          await loadSettings();
-          setIsLoading(false);
-          onNotify("Sistema liberado com sucesso.", 'success');
+    const newMode = !settings.maintenanceMode;
+    const actionName = newMode ? "ATIVAR" : "DESATIVAR";
+    
+    if (confirm(`Deseja ${actionName} o modo de manutenção? ${newMode ? 'Usuários serão desconectados.' : 'Acesso será liberado.'}`)) {
+       setIsLoading(true);
+       try {
+         const updated = await api.system.updateSettings({ 
+           maintenanceMode: newMode, 
+           lastUpdatedBy: 'Admin' 
+         });
+         
+         // Atualiza o estado visual IMEDIATAMENTE com a resposta
+         setSettings(updated);
+         
+         onNotify(`Modo manutenção ${newMode ? 'ATIVADO' : 'DESATIVADO'} com sucesso.`, 'success');
+       } catch (error) {
+         onNotify("Erro ao alterar modo de manutenção.", 'error');
+       } finally {
+         setIsLoading(false);
        }
-    } else {
-       // Turning ON
-       if (confirm("ATENÇÃO: Ativar o modo de manutenção irá desconectar TODOS os usuários (exceto Admin). Deseja continuar?")) {
-          setIsLoading(true);
-          await api.system.updateSettings({ maintenanceMode: true, lastUpdatedBy: 'Admin' });
-          await loadSettings();
-          setIsLoading(false);
-          onNotify("Bloqueio de sistema ativado.", 'success');
-       }
+    }
+  };
+
+  const updateMinVersion = async () => {
+    if (!minVersionInput) return;
+
+    if (confirm(`Alterar a versão mínima para ${minVersionInput}? Usuários com versões anteriores serão bloqueados.`)) {
+      setIsLoading(true);
+      try {
+        const updated = await api.system.updateSettings({ 
+          minAppVersion: minVersionInput, 
+          lastUpdatedBy: 'Admin' 
+        });
+        
+        // Atualiza o estado visual IMEDIATAMENTE
+        setSettings(updated);
+        setMinVersionInput(updated.minAppVersion || '');
+        
+        onNotify("Versão mínima atualizada.", 'success');
+      } catch (error) {
+        onNotify("Erro ao atualizar versão.", 'error');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -96,40 +127,70 @@ export const SystemControl: React.FC<SystemControlProps> = ({ currentUserRole, o
            </Button>
         </div>
 
-        {/* Card de Informações */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm flex flex-col">
-           <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-             <Activity className="w-5 h-5 text-blue-600" /> Status do Banco de Dados
-           </h3>
-           
-           <div className="space-y-4 flex-1">
-             <div className="bg-gray-50 p-4 rounded border border-gray-100">
-               <p className="text-xs font-bold text-gray-500 uppercase mb-1">Método de Persistência</p>
-               <p className="text-sm font-medium text-gray-800">Local Storage (Navegador) + Mock API</p>
-             </div>
+        <div className="flex flex-col gap-6">
+          {/* Card de Informações */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm flex flex-col flex-1">
+             <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+               <Activity className="w-5 h-5 text-blue-600" /> Status do Banco de Dados
+             </h3>
+             
+             <div className="space-y-4 flex-1">
+               <div className="bg-gray-50 p-4 rounded border border-gray-100">
+                 <p className="text-xs font-bold text-gray-500 uppercase mb-1">Método de Persistência</p>
+                 <p className="text-sm font-medium text-gray-800">Local Storage (Navegador) + Mock API</p>
+               </div>
 
-             <div className="bg-gray-50 p-4 rounded border border-gray-100">
-               <p className="text-xs font-bold text-gray-500 uppercase mb-1">Segurança de Dados</p>
-               <p className="text-sm font-medium text-gray-800">
-                 Os dados persistem mesmo após atualizações de código, desde que o cache do navegador não seja limpo.
-               </p>
-             </div>
+               <div className="bg-gray-50 p-4 rounded border border-gray-100">
+                 <p className="text-xs font-bold text-gray-500 uppercase mb-1">Segurança de Dados</p>
+                 <p className="text-sm font-medium text-gray-800">
+                   Os dados persistem na nuvem. O cache local é usado para performance.
+                 </p>
+               </div>
 
-             <div className="mt-auto bg-yellow-50 p-4 rounded border border-yellow-200">
-               <p className="text-xs font-bold text-yellow-800 uppercase mb-1 flex items-center gap-1">
-                 <Power className="w-3 h-3" /> Nota de Versão
-               </p>
-               <p className="text-xs text-yellow-700">
-                 Última atualização de estado: {new Date(settings.lastUpdatedAt).toLocaleString()}
-               </p>
+               <div className="mt-auto bg-yellow-50 p-4 rounded border border-yellow-200">
+                 <p className="text-xs font-bold text-yellow-800 uppercase mb-1 flex items-center gap-1">
+                   <Power className="w-3 h-3" /> Nota de Versão
+                 </p>
+                 <p className="text-xs text-yellow-700">
+                   Última atualização de estado: {settings.lastUpdatedAt && settings.lastUpdatedAt !== '-' ? new Date(settings.lastUpdatedAt).toLocaleString() : 'N/A'}
+                 </p>
+                 <p className="text-xs text-yellow-700 font-bold mt-1">
+                   Por: {settings.lastUpdatedBy}
+                 </p>
+               </div>
              </div>
-           </div>
-           
-           <div className="mt-4 pt-4 border-t border-gray-100">
-             <Button variant="secondary" className="w-full" onClick={loadSettings} icon={<RefreshCw className="w-4 h-4"/>}>
-               Atualizar Status
-             </Button>
-           </div>
+             
+             <div className="mt-4 pt-4 border-t border-gray-100">
+               <Button variant="secondary" className="w-full" onClick={loadSettings} icon={<RefreshCw className="w-4 h-4"/>}>
+                 Forçar Atualização de Status
+               </Button>
+             </div>
+          </div>
+
+          {/* Controle de Versão */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+             <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+               <AlertTriangle className="w-5 h-5 text-orange-600" /> Controle de Versão (Enforce Update)
+             </h3>
+             <div className="space-y-4">
+                <p className="text-sm text-gray-600">Defina a versão mínima do aplicativo (exe) para bloquear acessos desatualizados.</p>
+                <div className="flex gap-2">
+                  <Input 
+                    label="Versão Mínima (SemVer)" 
+                    value={minVersionInput} 
+                    onChange={e => setMinVersionInput(e.target.value)} 
+                    placeholder="1.0.0"
+                    className="flex-1"
+                  />
+                  <div className="flex items-end">
+                    <Button onClick={updateMinVersion} isLoading={isLoading}>Salvar</Button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400">
+                  Atual: {settings.minAppVersion || 'Não definido'}
+                </p>
+             </div>
+          </div>
         </div>
 
       </div>

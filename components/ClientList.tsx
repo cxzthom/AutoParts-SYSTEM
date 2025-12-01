@@ -11,6 +11,7 @@ interface ClientListProps {
   onCreateOrder: (items: OrderItem[], priority: 'NORMAL' | 'URGENTE', vehicleData?: VehicleInfo, maintenanceSystem?: MaintenanceSystem, maintenanceNotes?: string) => void;
   onRequestRegistration?: (description: string, brand?: string) => void; 
   onReportCorrection?: (partId: string, partName: string, notes: string) => void;
+  onEdit?: (id: string) => void;
   canEdit?: boolean;
   isMechanicView?: boolean;
   viewOnly?: boolean;
@@ -38,6 +39,7 @@ export const ClientList: React.FC<ClientListProps> = ({
   onCreateOrder, 
   onRequestRegistration,
   onReportCorrection,
+  onEdit,
   canEdit = true, 
   isMechanicView = false,
   viewOnly = false,
@@ -299,7 +301,7 @@ export const ClientList: React.FC<ClientListProps> = ({
 
            <div className="space-y-3">
               {pendingCorrections.map(req => (
-                <div key={req.id} className="bg-white border border-red-100 rounded-lg p-4 shadow-sm flex flex-col justify-between gap-2">
+                <div key={req.id} className="bg-white border border-red-100 rounded-lg p-4 shadow-sm flex flex-col justify-between gap-2 hover:shadow-md transition-shadow">
                    <div>
                      <p className="text-[10px] text-red-600 font-bold uppercase mb-1">
                        Reportado por: {req.requesterName.split('(')[0]}
@@ -346,7 +348,7 @@ export const ClientList: React.FC<ClientListProps> = ({
 
            <div className="space-y-3">
               {pendingOrders.map(order => (
-                <div key={order.id} className="bg-white border border-orange-100 rounded-lg p-4 shadow-sm flex flex-col md:flex-row justify-between gap-4">
+                <div key={order.id} className="bg-white border border-orange-100 rounded-lg p-4 shadow-sm flex flex-col md:flex-row justify-between gap-4 hover:shadow-md transition-shadow">
                    <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                          <span className="text-xs font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">#{order.id}</span>
@@ -376,7 +378,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                       <Button 
                         size="sm" 
                         onClick={() => onOrderAction && onOrderAction(order.id, 'DELIVER')}
-                        className="w-full bg-green-600 hover:bg-green-700 border-green-600 text-xs"
+                        className="w-full bg-green-600 hover:bg-green-700 border-green-600 text-xs shadow-sm hover:shadow"
                         icon={<CheckCircle2 className="w-3 h-3" />}
                         title="Confirmar entrega da peça e baixar do estoque"
                       >
@@ -386,7 +388,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                         size="sm" 
                         variant="secondary"
                         onClick={() => onOrderAction && onOrderAction(order.id, 'FORWARD_PURCHASING')}
-                        className="w-full text-xs"
+                        className="w-full text-xs shadow-sm hover:shadow"
                         icon={<Forward className="w-3 h-3" />}
                         title="Peça indisponível. Enviar para cotação de compra"
                       >
@@ -417,8 +419,8 @@ export const ClientList: React.FC<ClientListProps> = ({
 
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {pendingRequests.map(req => (
-                <div key={req.id} className="bg-white border border-purple-100 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                   <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20">
+                <div key={req.id} className="bg-white border border-purple-100 rounded-lg p-4 shadow-sm hover:shadow-lg transition-all relative overflow-hidden group hover:-translate-y-1">
+                   <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
                       <PlusCircle className="w-12 h-12 text-purple-600" />
                    </div>
                    <div className="relative z-10">
@@ -431,7 +433,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                      <Button 
                        size="sm" 
                        onClick={() => onProcessRequest && onProcessRequest(req)}
-                       className="w-full bg-purple-600 hover:bg-purple-700 border-purple-600 text-xs"
+                       className="w-full bg-purple-600 hover:bg-purple-700 border-purple-600 text-xs shadow-sm hover:shadow"
                        icon={<ArrowRight className="w-3 h-3" />}
                        title="Iniciar cadastro com dados pré-preenchidos"
                      >
@@ -445,13 +447,13 @@ export const ClientList: React.FC<ClientListProps> = ({
       )}
 
       {/* Brand Filter Bar */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 p-1">
         <button
           onClick={() => setFilterBrand('ALL')}
-          className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide border transition-all ${
+          className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide border transition-all hover:scale-105 active:scale-95 ${
             filterBrand === 'ALL' 
               ? 'bg-gray-900 text-white border-gray-900 shadow-md' 
-              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900 shadow-sm'
           }`}
           title="Exibir todas as marcas"
         >
@@ -461,10 +463,10 @@ export const ClientList: React.FC<ClientListProps> = ({
           <button
             key={brand}
             onClick={() => setFilterBrand(brand)}
-            className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide border transition-all flex items-center gap-1 ${
+            className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide border transition-all flex items-center gap-1 transform hover:scale-105 active:scale-95 ${
               filterBrand === brand 
                 ? 'bg-red-600 text-white border-red-600 shadow-md' 
-                : 'bg-white text-gray-600 border-gray-300 hover:border-red-300 hover:text-red-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:border-red-300 hover:text-red-600 hover:bg-red-50 shadow-sm'
             }`}
             title={`Filtrar por ${brand}`}
           >
@@ -488,7 +490,7 @@ export const ClientList: React.FC<ClientListProps> = ({
             placeholder="Buscar SKU, Nome, Código OEM ou Fornecedor..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-shadow hover:shadow-sm"
             title="Digite para pesquisar no catálogo"
           />
         </div>
@@ -501,7 +503,7 @@ export const ClientList: React.FC<ClientListProps> = ({
             <select 
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 hover:border-gray-400 cursor-pointer"
               title="Filtrar por sistema ou categoria"
             >
               <option value="ALL">Todas</option>
@@ -518,7 +520,7 @@ export const ClientList: React.FC<ClientListProps> = ({
             <select 
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 hover:border-gray-400 cursor-pointer"
               title="Filtrar por disponibilidade"
             >
               <option value="ALL">Todos</option>
@@ -536,7 +538,7 @@ export const ClientList: React.FC<ClientListProps> = ({
               type="date" 
               value={filterDate}
               onChange={(e) => setFilterDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 hover:border-gray-400"
               title="Filtrar por data de criação"
             />
           </div>
@@ -547,7 +549,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                <Button 
                 variant="secondary"
                 onClick={() => setIsRequestPartModalOpen(true)}
-                className="w-full border-dashed border-red-300 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-400"
+                className="w-full border-dashed border-red-300 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-400 transition-colors shadow-sm hover:shadow"
                 icon={<HelpCircle className="w-4 h-4"/>}
                 title="Abrir formulário de solicitação de peça nova"
               >
@@ -568,6 +570,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                 onClick={() => setIsRequestPartModalOpen(true)}
                 icon={<PlusCircle className="w-4 h-4"/>}
                 title="Abrir formulário de solicitação de peça nova"
+                className="hover:shadow-md transition-shadow"
               >
                 Solicitar Cadastro de Peça Nova
               </Button>
@@ -579,19 +582,19 @@ export const ClientList: React.FC<ClientListProps> = ({
             return (
               <div 
                 key={part.id} 
-                className={`bg-white p-5 rounded-md shadow-sm border transition-all hover:border-gray-400 relative overflow-hidden group ${isSelected ? 'border-red-500 ring-1 ring-red-500 bg-red-50/10' : 'border-gray-200'}`}
+                className={`bg-white p-5 rounded-md shadow-sm border transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1 relative overflow-hidden group ${isSelected ? 'border-red-500 ring-1 ring-red-500 bg-red-50/10' : 'border-gray-200 hover:border-red-300'}`}
               >
                 {/* Checkbox Area - HIDDEN IF VIEW ONLY */}
                 {!viewOnly && (
                   <div 
                     onClick={() => toggleSelection(part.id)}
-                    className="absolute top-0 left-0 bottom-0 w-12 cursor-pointer z-20 flex items-center justify-center hover:bg-gray-50 transition-colors border-r border-transparent group-hover:border-gray-100"
+                    className="absolute top-0 left-0 bottom-0 w-12 cursor-pointer z-20 flex items-center justify-center hover:bg-gray-100/50 transition-colors border-r border-transparent group-hover:border-gray-100"
                     title={isSelected ? "Deselecionar item" : "Selecionar item"}
                   >
                     {isSelected ? (
                       <CheckSquare className="w-5 h-5 text-red-600" />
                     ) : (
-                      <Square className="w-5 h-5 text-gray-300 group-hover:text-gray-500" />
+                      <Square className="w-5 h-5 text-gray-300 group-hover:text-gray-500 transition-colors" />
                     )}
                   </div>
                 )}
@@ -601,7 +604,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                   {/* Image Thumbnail with Overlay */}
                   <div className="flex-shrink-0 md:self-start">
                     <div 
-                      className="w-full md:w-32 h-32 rounded bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center relative cursor-zoom-in group/image"
+                      className="w-full md:w-32 h-32 rounded bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center relative cursor-zoom-in group/image shadow-sm"
                       onClick={() => part.imageUrl && openImage(part.imageUrl)}
                       title="Clique para ampliar a imagem"
                     >
@@ -610,7 +613,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                           <img 
                             src={part.imageUrl} 
                             alt={part.name} 
-                            className="w-full h-full object-cover transition-transform duration-300" 
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover/image:scale-110" 
                           />
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/image:opacity-100 transition-opacity">
                              <Maximize2 className="w-8 h-8 text-white" />
@@ -646,7 +649,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                     </div>
 
                     <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                      <div className="bg-gray-50 p-3 rounded border border-gray-200 hover:border-gray-300 transition-colors">
                         <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
                           <Barcode className="w-3 h-3" /> SKU / OEM
                         </p>
@@ -656,11 +659,11 @@ export const ClientList: React.FC<ClientListProps> = ({
                         </div>
                         <div className="flex justify-between items-baseline mt-1 border-t border-gray-100 pt-1">
                            <span className="text-xs text-gray-500">Original:</span>
-                           <span className="font-mono text-sm text-gray-600">{part.originalCode}</span>
+                           <span className="font-mono text-gray-600">{part.originalCode}</span>
                         </div>
                       </div>
 
-                      <div className="bg-white p-3 rounded border border-gray-200">
+                      <div className="bg-white p-3 rounded border border-gray-200 hover:border-gray-300 transition-colors">
                          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Fabricante</p>
                          <p className="font-semibold text-gray-800 text-sm truncate">{part.supplierName}</p>
                          <p className="text-xs text-gray-500 truncate">{part.supplierEmail}</p>
@@ -676,7 +679,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                        {part.compatibleBrands && part.compatibleBrands.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-3 ml-3">
                             {part.compatibleBrands.map(brand => (
-                              <span key={brand} className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200 flex items-center gap-1">
+                              <span key={brand} className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-200 transition-colors cursor-default">
                                 <Cog className="w-3 h-3" /> {brand}
                               </span>
                             ))}
@@ -693,7 +696,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                           setZoomLevel(1);
                           setViewingManualPart(part);
                         }}
-                        className="w-full text-xs border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                        className="w-full text-xs border-gray-300 text-gray-700 bg-white hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400 shadow-sm hover:shadow transition-all"
                         icon={<FileText className="w-3.5 h-3.5" />}
                         title="Ver manual técnico ou datasheet"
                       >
@@ -706,7 +709,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                           variant="ghost" 
                           size="sm"
                           onClick={() => openReportModal(part)}
-                          className="w-full text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border border-transparent hover:border-red-100"
+                          className="w-full text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border border-transparent hover:border-red-100 transition-colors"
                           icon={<FileWarning className="w-3.5 h-3.5" />}
                           title="Reportar problema no cadastro"
                         >
@@ -719,7 +722,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                         <Button 
                           size="sm"
                           onClick={() => onAddToCart(part)}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white border-none mt-auto"
+                          className="w-full bg-green-600 hover:bg-green-700 text-white border-none mt-auto shadow-md hover:shadow-lg transition-all hover:scale-105"
                           icon={<Plus className="w-4 h-4" />}
                           title="Adicionar item à venda atual"
                         >
@@ -729,10 +732,20 @@ export const ClientList: React.FC<ClientListProps> = ({
 
                       {canEdit && !viewOnly && !showPrice && (
                         <div className="flex gap-2 w-full mt-auto">
-                          <Button variant="ghost" className="flex-1 text-gray-500 border border-gray-200 rounded" title="Editar informações da peça">
+                          <Button 
+                            variant="ghost" 
+                            className="flex-1 text-gray-500 border border-gray-200 rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors" 
+                            title="Editar informações da peça"
+                            onClick={() => onEdit && onEdit(part.id)}
+                          >
                             <Edit2 className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 border border-gray-200 rounded" onClick={() => onDelete(part.id)} title="Remover peça do estoque">
+                          <Button 
+                            variant="ghost" 
+                            className="flex-1 text-red-600 hover:text-white hover:bg-red-600 border border-gray-200 rounded hover:border-red-600 transition-colors" 
+                            onClick={() => onDelete(part.id)} 
+                            title="Remover peça do estoque"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
@@ -750,7 +763,7 @@ export const ClientList: React.FC<ClientListProps> = ({
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900 border-t border-gray-800 shadow-2xl z-30 animate-in slide-in-from-bottom-10">
           <div className="max-w-6xl mx-auto flex items-center justify-between text-white">
             <div className="flex items-center gap-4">
-              <div className="bg-red-600 text-white w-10 h-10 rounded flex items-center justify-center font-bold shadow-lg border border-red-500">
+              <div className="bg-red-600 text-white w-10 h-10 rounded flex items-center justify-center font-bold shadow-lg border border-red-500 animate-bounce">
                 {selectedIds.size}
               </div>
               <div className="flex flex-col">
@@ -764,7 +777,7 @@ export const ClientList: React.FC<ClientListProps> = ({
                 variant="primary"
                 onClick={() => setIsOrderModalOpen(true)}
                 icon={<ShoppingCart className="w-4 h-4" />}
-                className="bg-white text-gray-900 hover:bg-gray-100 border-none font-bold"
+                className="bg-white text-gray-900 hover:bg-gray-100 border-none font-bold hover:scale-105 transition-transform"
                 title="Revisar e confirmar o pedido"
               >
                 Revisar {canEdit ? 'Pedido' : 'Solicitação'}

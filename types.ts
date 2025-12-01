@@ -182,6 +182,7 @@ export interface MaintenanceRecord {
 
 export interface SystemSettings {
   maintenanceMode: boolean;
+  minAppVersion?: string; // Versão mínima exigida do App (SemVer)
   lastUpdatedBy: string;
   lastUpdatedAt: string;
 }
