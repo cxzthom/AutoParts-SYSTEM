@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { PartStatus, PartCategory, POPULAR_BRANDS } from "../types";
 
-const apiKey = process.env.API_KEY || '';
+const apiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) ? process.env.API_KEY : '';
 const ai = new GoogleGenAI({ apiKey });
 
 // Schema for generating an auto part profile

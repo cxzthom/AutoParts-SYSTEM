@@ -118,7 +118,7 @@ export default function App() {
   // Initial Data Fetch & Live Sync Subscription
   useEffect(() => {
     if (isAuthenticated) {
-        loadCloudData();
+        loadCloudData().catch(e => console.error("Initial load failed", e));
     } else {
         setIsInitialLoad(false);
     }
@@ -150,6 +150,9 @@ export default function App() {
              handleLogout();
              alert("O sistema entrou em modo de manutenção. Você foi desconectado.");
            }
+      }).catch(err => {
+         // Silently fail on network error during background check to avoid app crash
+         console.warn("Falha ao verificar manutenção (background):", err);
       });
     };
     
