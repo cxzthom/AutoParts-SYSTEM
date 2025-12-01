@@ -1,7 +1,7 @@
 {
   "name": "autoparts-erp-desktop",
   "private": true,
-  "version": "1.0.7",
+  "version": "1.0.8",
   "main": "electron/main.js",
   "description": "Sistema ERP para Gestão de Autopeças (Desktop Windows)",
   "author": "AutoParts IT",
