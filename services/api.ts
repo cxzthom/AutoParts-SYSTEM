@@ -9,18 +9,23 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyUbiA8AtqgvM
 const LATENCY_MS = 0; 
 
 // --- MOCK CONSTANTS (Usadas apenas como valores iniciais padrão caso a nuvem esteja vazia) ---
-const MOCK_SETTINGS: SystemSettings = { maintenanceMode: false, minAppVersion: '0.0.0', lastUpdatedBy: 'System', lastUpdatedAt: new Date().toISOString() };
+const MOCK_SETTINGS: SystemSettings = { 
+  maintenanceMode: false, 
+  minAppVersion: '0.0.0', 
+  internalSystemPassword: '123', // Senha padrão do Gateway
+  lastUpdatedBy: 'System', 
+  lastUpdatedAt: new Date().toISOString() 
+};
 const MOCK_CATALOG_CONFIG: CatalogConfig = { customBrands: [], customCategories: [], vehicleModels: [] };
 const MOCK_VEHICLES_INITIAL: VehicleInfo[] = [];
 const MOCK_PARTS: AutoPart[] = [];
 const MOCK_DIAGRAMS: AssemblyDiagram[] = [];
 const MOCK_USERS: User[] = [
-  { id: 'u0', name: 'SysAdmin (TI)', email: 'admin.ti@autoparts.com', password: '123', role: UserRole.ADMIN, department: 'Tecnologia da Informação' }
+  { id: 'u0', name: 'SysAdmin (TI)', email: 'admin.ti@mecsystem.com', password: '123', role: UserRole.ADMIN, department: 'Tecnologia da Informação' }
 ];
 const MOCK_ORDERS: Order[] = [];
 
 // --- HELPER FUNCTIONS ---
-const delay = () => new Promise(resolve => setTimeout(resolve, LATENCY_MS));
 const syncChannel = new BroadcastChannel('autoparts_cloud_sync');
 
 const notifyUpdate = (type: string) => {
@@ -28,6 +33,23 @@ const notifyUpdate = (type: string) => {
     syncChannel.postMessage({ type, timestamp: Date.now() });
   } catch (e) { console.warn("BroadcastChannel error", e); }
 };
+
+// Retry logic for unstable connections
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 500) {
+  try {
+    const res = await fetch(url, options);
+    if (!res.ok) {
+        // Se for erro de servidor (5xx), tenta de novo. Se for 4xx, lança erro.
+        if (res.status >= 500) throw new Error(`Server Error: ${res.status}`);
+        return res;
+    }
+    return res;
+  } catch (err) {
+    if (retries <= 1) throw err;
+    await new Promise(r => setTimeout(r, backoff));
+    return fetchWithRetry(url, options, retries - 1, backoff * 1.5);
+  }
+}
 
 // --- DATABASE LAYER (RAM + CLOUD ONLY) ---
 
@@ -37,17 +59,19 @@ let globalCache: any = null;
 const db = {
   // Busca o banco de dados COMPLETO da nuvem
   // force = true ignora o cache e busca o dado real agora
-  fetchFullDB: async (force = false) => {
+  // strict = true lança erro se falhar (não usa cache)
+  fetchFullDB: async (force = false, strict = false) => {
     // Se já temos em RAM e não estamos forçando, retorna rápido
     if (globalCache && !force) return globalCache;
 
     try {
       // Tenta conectar à Nuvem com configurações otimizadas para evitar CORS Errors
       // Adicionado cache busting via timestamp para evitar cache agressivo de redes/browsers
-      const res = await fetch(`${GOOGLE_SCRIPT_URL}?t=${Date.now()}`, {
+      const res = await fetchWithRetry(`${GOOGLE_SCRIPT_URL}?t=${Date.now()}`, {
         method: 'GET',
-        redirect: 'follow',
-        credentials: 'omit' // Importante para evitar conflitos de cookie com contas Google logadas
+        redirect: 'follow', // Segue o redirect do Google (302)
+        credentials: 'omit', // Importante para evitar conflitos de cookie
+        mode: 'cors'
       });
       
       if (!res.ok) throw new Error(`Erro na resposta do servidor: ${res.status}`);
@@ -57,8 +81,10 @@ const db = {
       return data;
     } catch (e) {
       console.error("ERRO CRÍTICO: Falha ao conectar com Google Drive:", e);
-      // Se falhar e tivermos cache, usamos o cache para não travar o app (fallback)
-      if (globalCache) return globalCache;
+      // Se falhar e tivermos cache, usamos o cache para não travar o app (fallback), a menos que seja strict
+      if (globalCache && !strict) return globalCache;
+      
+      // Se for strict (ex: login) ou não tiver cache, explode o erro
       throw new Error("SEM CONEXÃO: O sistema exige internet para acessar o banco de dados seguro. Verifique sua conexão.");
     }
   },
@@ -77,19 +103,21 @@ const db = {
 
     // 2. Envia para o Google Drive
     try {
-      // POST como 'text/plain' evita Preflight OPTIONS request que o Google Apps Script não suporta bem
-      await fetch(GOOGLE_SCRIPT_URL, {
+      // FIX CRITICO: Google Apps Script falha com headers complexos em POST.
+      // Usar text/plain força "Simple Request" e evita Preflight CORS (OPTIONS) que costuma falhar.
+      await fetchWithRetry(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         redirect: 'follow',
         credentials: 'omit',
+        mode: 'cors',
         headers: {
-          'Content-Type': 'text/plain', // Simplificado para evitar CORS Preflight
+          'Content-Type': 'text/plain', 
         },
         body: JSON.stringify(globalCache),
       });
     } catch (e) {
       console.error("Erro ao salvar na nuvem:", e);
-      alert("ATENÇÃO: Erro de conexão ao salvar dados. Verifique sua internet.");
+      alert("ATENÇÃO: Erro de conexão ao salvar dados. As alterações podem ter sido perdidas. Verifique sua internet.");
       throw e;
     }
   },
@@ -122,6 +150,7 @@ const createLog = async (
     description,
     details
   };
+  // Logging é "fire and forget", não bloqueia a UI
   db.addLog(log).catch(console.error);
 };
 
@@ -159,11 +188,19 @@ export const api = {
 
   auth: {
     login: async (email: string, pass: string): Promise<User | null> => {
-      // Login SEMPRE força refresh para garantir credenciais atualizadas e status de manutenção real
-      const settings = await db.get<SystemSettings>('settings', MOCK_SETTINGS, true);
+      // Login SEMPRE força refresh (force=true) e é estrito (strict=true)
+      // Se não conectar na nuvem, NÃO deixa logar. Segurança primeiro.
+      let settings;
+      try {
+        await db.fetchFullDB(true, true); 
+        settings = await db.get<SystemSettings>('settings', MOCK_SETTINGS);
+      } catch (e) {
+        throw new Error("NETWORK_ERROR");
+      }
+
       const cleanEmail = email.trim().toLowerCase();
       
-      const storedUsers = await db.get<User[]>('users', [], true);
+      const storedUsers = await db.get<User[]>('users', [], false); // Já buscou fullDB acima
       const allUsers = [...MOCK_USERS, ...storedUsers.filter(su => !MOCK_USERS.find(mu => mu.email === su.email))];
       
       const user = allUsers.find(u => u.email.toLowerCase() === cleanEmail && u.password === pass);
@@ -202,6 +239,19 @@ export const api = {
       createLog('CREATE', 'STOCK', `Novo diagrama cadastrado: ${diagram.name}`, '');
       notifyUpdate('DIAGRAMS_UPDATE');
       return diagram;
+    },
+    update: async (id: string, data: Partial<AssemblyDiagram>): Promise<AssemblyDiagram> => {
+      const list = await db.get<AssemblyDiagram[]>('diagrams', MOCK_DIAGRAMS);
+      const index = list.findIndex(d => d.id === id);
+      if (index === -1) throw new Error("Diagram not found");
+      
+      const updated = { ...list[index], ...data };
+      list[index] = updated;
+      await db.set('diagrams', list);
+      
+      createLog('UPDATE', 'STOCK', `Diagrama atualizado: ${updated.name}`, `Campos: ${Object.keys(data).join(', ')}`);
+      notifyUpdate('DIAGRAMS_UPDATE');
+      return updated;
     },
     delete: async (id: string): Promise<void> => {
       const list = await db.get<AssemblyDiagram[]>('diagrams', MOCK_DIAGRAMS);

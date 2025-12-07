@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { AutoPart, PartStatus, PartCategory, OrderItem, VehicleInfo, MaintenanceSystem, POPULAR_BRANDS, Order, OrderStatus } from '../types';
-import { Search, Trash2, Edit2, Filter, Calendar, Tag, Barcode, CheckSquare, Square, FileText, ZoomIn, ZoomOut, X, ShoppingCart, CheckCircle2, ImageOff, AlertTriangle, Bus, Wrench, Cog, PlusCircle, HelpCircle, ArrowRight, Inbox, PackageCheck, Forward, Eye, FileWarning, ExternalLink, Plus, Maximize2, Move, RotateCcw } from 'lucide-react';
+import { Search, Trash2, Edit2, Filter, Calendar, Tag, Barcode, CheckSquare, Square, FileText, ZoomIn, ZoomOut, X, ShoppingCart, CheckCircle2, ImageOff, AlertTriangle, Bus, Wrench, Cog, PlusCircle, HelpCircle, ArrowRight, Inbox, PackageCheck, Forward, Eye, FileWarning, ExternalLink, Plus, Maximize2, Move, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from './Button';
 import { Input } from './Input';
 
@@ -17,18 +17,15 @@ interface ClientListProps {
   viewOnly?: boolean;
   vehiclesDB?: VehicleInfo[];
   
-  // Props para o Inbox de Solicitações (Estoque)
   pendingRequests?: Order[];
   pendingOrders?: Order[];
   pendingCorrections?: Order[];
   onProcessRequest?: (request: Order) => void;
   onOrderAction?: (orderId: string, action: 'DELIVER' | 'FORWARD_PURCHASING' | 'REJECT' | 'RESOLVE_CORRECTION') => void;
 
-  // Novos props para Vendas (PDV)
   showPrice?: boolean;
   onAddToCart?: (part: AutoPart) => void;
   
-  // Configuração dinâmica
   customBrands?: string[];
   customCategories?: string[];
 }
@@ -54,52 +51,40 @@ export const ClientList: React.FC<ClientListProps> = ({
   customBrands = [],
   customCategories = []
 }) => {
-  // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [filterBrand, setFilterBrand] = useState<string>('ALL');
   const [filterDate, setFilterDate] = useState<string>('');
   
-  // Seleção e Pedidos
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [orderPriority, setOrderPriority] = useState<'NORMAL' | 'URGENTE'>('NORMAL');
   
-  // Solicitação de Cadastro (Mecânico)
   const [isRequestPartModalOpen, setIsRequestPartModalOpen] = useState(false);
   const [requestPartDescription, setRequestPartDescription] = useState('');
 
-  // Reporte de Erro (Mecânico)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportPart, setReportPart] = useState<AutoPart | null>(null);
   const [reportNotes, setReportNotes] = useState('');
 
-  // Dados Específicos de Mecânica (Estado Estendido)
   const [vehicleData, setVehicleData] = useState<VehicleInfo>({
-    prefix: '',
-    plate: '',
-    vin: '',
-    model: '',
-    year: '',
-    bodyType: ''
+    prefix: '', plate: '', vin: '', model: '', year: '', bodyType: ''
   });
   const [maintenanceSystem, setMaintenanceSystem] = useState<MaintenanceSystem>(MaintenanceSystem.ENGINE);
   const [maintenanceNotes, setMaintenanceNotes] = useState('');
 
-  // Visualizador de Manual
-  const [viewingManualPart, setViewingManualPart] = useState<AutoPart | null>(null);
-  const [zoomLevel, setZoomLevel] = useState(1);
-
-  // --- NOVO: Visualizador de Imagem Expandida (Zoom & Pan) ---
-  const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  // Image Viewer State
+  const [expandedImages, setExpandedImages] = useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imgZoom, setImgZoom] = useState(1);
   const [imgPos, setImgPos] = useState({ x: 0, y: 0 });
   const [isImgDragging, setIsImgDragging] = useState(false);
   const [imgDragStart, setImgDragStart] = useState({ x: 0, y: 0 });
   
-  // Combine static and custom data
   const availableBrands = useMemo(() => [...POPULAR_BRANDS, ...customBrands], [customBrands]);
   const availableCategories = useMemo(() => [...Object.values(PartCategory), ...customCategories], [customCategories]);
 
@@ -113,7 +98,6 @@ export const ClientList: React.FC<ClientListProps> = ({
       
       const matchesStatus = filterStatus === 'ALL' || part.status === filterStatus;
       const matchesCategory = filterCategory === 'ALL' || part.category === filterCategory;
-      
       const matchesBrand = filterBrand === 'ALL' || (
         (part.compatibleBrands && part.compatibleBrands.includes(filterBrand)) ||
         part.name.toLowerCase().includes(filterBrand.toLowerCase()) ||
@@ -130,896 +114,560 @@ export const ClientList: React.FC<ClientListProps> = ({
     });
   }, [parts, searchTerm, filterStatus, filterCategory, filterBrand, filterDate]);
 
-  // --- Handlers de Imagem (Zoom/Pan) ---
-  const openImage = (url: string) => {
-    setExpandedImage(url);
-    setImgZoom(1);
-    setImgPos({ x: 0, y: 0 });
-  };
+  // Handlers de Imagem (Zoom/Pan)
+  const openImage = (images: string[]) => { setExpandedImages(images); setCurrentImageIndex(0); setImgZoom(1); setImgPos({ x: 0, y: 0 }); };
+  const closeImage = () => { setExpandedImages([]); };
+  const nextImage = (e: React.MouseEvent) => { e.stopPropagation(); setCurrentImageIndex(prev => (prev + 1) % expandedImages.length); setImgZoom(1); setImgPos({x:0, y:0}); };
+  const prevImage = (e: React.MouseEvent) => { e.stopPropagation(); setCurrentImageIndex(prev => (prev - 1 + expandedImages.length) % expandedImages.length); setImgZoom(1); setImgPos({x:0, y:0}); };
 
-  const closeImage = () => {
-    setExpandedImage(null);
-  };
+  const handleImageWheel = (e: React.WheelEvent) => { e.stopPropagation(); const delta = e.deltaY * -0.001; setImgZoom(prev => Math.min(Math.max(0.5, prev + delta), 5)); };
+  const handleImageMouseDown = (e: React.MouseEvent) => { e.preventDefault(); setIsImgDragging(true); setImgDragStart({ x: e.clientX - imgPos.x, y: e.clientY - imgPos.y }); };
+  const handleImageMouseMove = (e: React.MouseEvent) => { if (isImgDragging) { e.preventDefault(); setImgPos({ x: e.clientX - imgDragStart.x, y: e.clientY - imgDragStart.y }); } };
+  const handleImageMouseUp = () => { setIsImgDragging(false); };
+  const resetImageTransform = () => { setImgZoom(1); setImgPos({ x: 0, y: 0 }); };
 
-  const handleImageWheel = (e: React.WheelEvent) => {
-    e.stopPropagation();
-    const delta = e.deltaY * -0.001;
-    setImgZoom(prev => Math.min(Math.max(0.5, prev + delta), 5));
-  };
-
-  const handleImageMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsImgDragging(true);
-    setImgDragStart({ x: e.clientX - imgPos.x, y: e.clientY - imgPos.y });
-  };
-
-  const handleImageMouseMove = (e: React.MouseEvent) => {
-    if (isImgDragging) {
-      e.preventDefault();
-      setImgPos({
-        x: e.clientX - imgDragStart.x,
-        y: e.clientY - imgDragStart.y
-      });
-    }
-  };
-
-  const handleImageMouseUp = () => {
-    setIsImgDragging(false);
-  };
-
-  const resetImageTransform = () => {
-    setImgZoom(1);
-    setImgPos({ x: 0, y: 0 });
-  };
-
-  // --- Handlers de Seleção ---
   const toggleSelection = (id: string) => {
     if (viewOnly) return; 
-
     const newSet = new Set(selectedIds);
-    if (newSet.has(id)) {
-      newSet.delete(id);
-      const newQtys = {...quantities};
-      delete newQtys[id];
-      setQuantities(newQtys);
-    } else {
-      newSet.add(id);
-      setQuantities(prev => ({...prev, [id]: 1})); 
-    }
+    if (newSet.has(id)) { newSet.delete(id); const newQtys = {...quantities}; delete newQtys[id]; setQuantities(newQtys); } 
+    else { newSet.add(id); setQuantities(prev => ({...prev, [id]: 1})); }
     setSelectedIds(newSet);
   };
 
-  const updateQuantity = (id: string, qty: number) => {
-    if (qty < 1) return;
-    setQuantities(prev => ({...prev, [id]: qty}));
-  };
-
-  const clearSelection = () => {
-    setSelectedIds(new Set());
-    setQuantities({});
-    setIsOrderModalOpen(false);
-    setOrderPriority('NORMAL');
-    setVehicleData({ prefix: '', plate: '', vin: '', model: '', year: '', bodyType: '' });
-    setMaintenanceNotes('');
-    setMaintenanceSystem(MaintenanceSystem.ENGINE);
-  };
+  const updateQuantity = (id: string, qty: number) => { if (qty < 1) return; setQuantities(prev => ({...prev, [id]: qty})); };
+  const clearSelection = () => { setSelectedIds(new Set()); setQuantities({}); setIsOrderModalOpen(false); setOrderPriority('NORMAL'); setVehicleData({ prefix: '', plate: '', vin: '', model: '', year: '', bodyType: '' }); setMaintenanceNotes(''); setMaintenanceSystem(MaintenanceSystem.ENGINE); };
 
   const handleFinishOrder = () => {
     if (isMechanicView) {
-      if (!vehicleData.prefix.trim()) {
-        alert("O Prefixo do veículo é obrigatório.");
-        return;
-      }
-      if (!vehicleData.plate.trim()) {
-        alert("Veículo não identificado na base de frota.");
-        return;
-      }
+      if (!vehicleData.prefix.trim()) { alert("O Prefixo do veículo é obrigatório."); return; }
+      if (!vehicleData.plate.trim()) { alert("Veículo não identificado na base de frota."); return; }
     }
-
     const selectedIdsArray = Array.from(selectedIds) as string[];
     const items: OrderItem[] = selectedIdsArray.map(id => {
       const part = parts.find(p => p.id === id);
-      return {
-        partId: id,
-        partName: part?.name || 'Unknown',
-        internalCode: part?.internalCode || 'N/A',
-        quantity: quantities[id] || 1
-      };
+      return { partId: id, partName: part?.name || 'Unknown', internalCode: part?.internalCode || 'N/A', quantity: quantities[id] || 1 };
     });
-
     onCreateOrder(items, orderPriority, vehicleData, maintenanceSystem, maintenanceNotes);
     clearSelection();
   };
 
   const handlePrefixBlur = () => {
     if (!vehicleData.prefix || !vehiclesDB.length) return;
-    
     const foundVehicle = vehiclesDB.find(v => v.prefix === vehicleData.prefix);
-    if (foundVehicle) {
-      setVehicleData(foundVehicle);
-    } else {
-      setVehicleData(prev => ({...prev, plate: '', vin: '', model: '', year: '', bodyType: ''}));
-    }
+    if (foundVehicle) setVehicleData(foundVehicle);
+    else setVehicleData(prev => ({...prev, plate: '', vin: '', model: '', year: '', bodyType: ''}));
   };
 
   const handleSubmitRegistrationRequest = () => {
-    if (!requestPartDescription.trim()) {
-      alert("Por favor, descreva a peça que você precisa.");
-      return;
-    }
-    if (onRequestRegistration) {
-      onRequestRegistration(requestPartDescription, filterBrand !== 'ALL' ? filterBrand : undefined);
-      setIsRequestPartModalOpen(false);
-      setRequestPartDescription('');
-    }
+    if (!requestPartDescription.trim()) { alert("Por favor, descreva a peça que você precisa."); return; }
+    if (onRequestRegistration) { onRequestRegistration(requestPartDescription, filterBrand !== 'ALL' ? filterBrand : undefined); setIsRequestPartModalOpen(false); setRequestPartDescription(''); }
   };
 
-  const openReportModal = (part: AutoPart) => {
-    setReportPart(part);
-    setReportNotes('');
-    setIsReportModalOpen(true);
-  };
+  const openReportModal = (part: AutoPart) => { setReportPart(part); setReportNotes(''); setIsReportModalOpen(true); };
+  const handleSubmitReport = () => { if (reportPart && reportNotes && onReportCorrection) { onReportCorrection(reportPart.id, reportPart.name, reportNotes); setIsReportModalOpen(false); setReportPart(null); setReportNotes(''); } };
 
-  const handleSubmitReport = () => {
-    if (reportPart && reportNotes && onReportCorrection) {
-      onReportCorrection(reportPart.id, reportPart.name, reportNotes);
-      setIsReportModalOpen(false);
-      setReportPart(null);
-      setReportNotes('');
-    }
-  };
-
-  // --- Visual Helpers ---
-  const getStatusColor = (status: PartStatus) => {
-    switch (status) {
-      case PartStatus.IN_STOCK: return 'bg-green-100 text-green-800 border-green-200';
-      case PartStatus.LOW_STOCK: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case PartStatus.OUT_OF_STOCK: return 'bg-red-100 text-red-800 border-red-200';
-      case PartStatus.DISCONTINUED: return 'bg-gray-100 text-gray-600 border-gray-200';
-      default: return 'bg-gray-100 text-gray-700';
-    }
+  const getPartImages = (part: AutoPart): string[] => {
+    if (part.imageUrls && part.imageUrls.length > 0) return part.imageUrls;
+    if (part.imageUrl) return [part.imageUrl];
+    return [];
   };
 
   return (
     <div className="space-y-6 pb-24">
-
-      {/* SECTION: Inbox - Notificações de Correção */}
-      {!isMechanicView && !viewOnly && !showPrice && pendingCorrections && pendingCorrections.length > 0 && (
-         <div className="bg-gradient-to-r from-red-50 to-white p-5 rounded-md border border-red-200 shadow-sm animate-in fade-in slide-in-from-top-4">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="bg-red-100 p-2 rounded-full">
-                <FileWarning className="w-5 h-5 text-red-600" />
-              </div>
-              <div>
-                 <h3 className="text-lg font-bold text-gray-900">Inconsistências Reportadas</h3>
-                 <p className="text-xs text-gray-500">A oficina identificou erros em cadastros ou manuais.</p>
-              </div>
-              <span className="ml-auto bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-full">
-                {pendingCorrections.length} alertas
-              </span>
-           </div>
-
-           <div className="space-y-3">
-              {pendingCorrections.map(req => (
-                <div key={req.id} className="bg-white border border-red-100 rounded-lg p-4 shadow-sm flex flex-col justify-between gap-2 hover:shadow-md transition-shadow">
-                   <div>
-                     <p className="text-[10px] text-red-600 font-bold uppercase mb-1">
-                       Reportado por: {req.requesterName.split('(')[0]}
-                     </p>
-                     <p className="text-gray-800 font-medium text-sm mb-1">
-                       Peça Alvo: <span className="font-bold">{req.items[0]?.partName}</span> ({req.items[0]?.internalCode})
-                     </p>
-                     <p className="text-gray-600 text-xs italic bg-gray-50 p-2 rounded border border-gray-100">
-                       "{req.notes}"
-                     </p>
-                   </div>
-                   <div className="flex justify-end pt-2">
-                      <Button 
-                       size="sm" 
-                       onClick={() => onOrderAction && onOrderAction(req.id, 'RESOLVE_CORRECTION')}
-                       className="bg-red-100 hover:bg-red-200 text-red-800 border-red-200 text-xs"
-                       icon={<CheckCircle2 className="w-3 h-3" />}
-                       title="Marcar inconsistência como resolvida e arquivar"
-                     >
-                       Marcar como Resolvido
-                     </Button>
-                   </div>
-                </div>
-              ))}
-           </div>
-         </div>
-      )}
-
-      {/* SECTION: Inbox - Requisições de Saída */}
-      {!isMechanicView && !viewOnly && !showPrice && pendingOrders.length > 0 && (
-         <div className="bg-gradient-to-r from-orange-50 to-white p-5 rounded-md border border-orange-200 shadow-sm animate-in fade-in slide-in-from-top-4">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="bg-orange-100 p-2 rounded-full">
-                <PackageCheck className="w-5 h-5 text-orange-600" />
-              </div>
-              <div>
-                 <h3 className="text-lg font-bold text-gray-900">Requisições de Balcão Pendentes</h3>
-                 <p className="text-xs text-gray-500">Solicitações da oficina aguardando separação ou compra.</p>
-              </div>
-              <span className="ml-auto bg-orange-600 text-white text-xs font-bold px-2 py-1 rounded-full">
-                {pendingOrders.length} aguardando
-              </span>
-           </div>
-
-           <div className="space-y-3">
-              {pendingOrders.map(order => (
-                <div key={order.id} className="bg-white border border-orange-100 rounded-lg p-4 shadow-sm flex flex-col md:flex-row justify-between gap-4 hover:shadow-md transition-shadow">
-                   <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                         <span className="text-xs font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">#{order.id}</span>
-                         <span className="text-xs text-orange-600 font-bold">{order.requesterName}</span>
-                         {order.priority === 'URGENTE' && (
-                            <span className="text-[10px] font-bold bg-red-100 text-red-700 px-1.5 py-0.5 rounded border border-red-200 flex items-center gap-0.5">
-                               <AlertTriangle className="w-3 h-3"/> URGENTE
-                            </span>
-                         )}
-                      </div>
-                      <div className="space-y-1">
-                         {order.items.map((item, i) => (
-                           <div key={i} className="flex items-center justify-between text-sm text-gray-700 border-b border-gray-50 pb-1 last:border-0">
-                              <span>{item.partName}</span>
-                              <span className="font-mono font-bold bg-gray-50 px-2 rounded">x{item.quantity}</span>
-                           </div>
-                         ))}
-                      </div>
-                      {order.vehicleInfo?.prefix && (
-                        <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-                           <Bus className="w-3 h-3" /> Veículo: {order.vehicleInfo.prefix} ({order.vehicleInfo.plate})
-                        </div>
-                      )}
-                   </div>
-                   
-                   <div className="flex flex-row md:flex-col gap-2 justify-center min-w-[140px]">
-                      <Button 
-                        size="sm" 
-                        onClick={() => onOrderAction && onOrderAction(order.id, 'DELIVER')}
-                        className="w-full bg-green-600 hover:bg-green-700 border-green-600 text-xs shadow-sm hover:shadow"
-                        icon={<CheckCircle2 className="w-3 h-3" />}
-                        title="Confirmar entrega da peça e baixar do estoque"
-                      >
-                        Atender (Estoque)
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="secondary"
-                        onClick={() => onOrderAction && onOrderAction(order.id, 'FORWARD_PURCHASING')}
-                        className="w-full text-xs shadow-sm hover:shadow"
-                        icon={<Forward className="w-3 h-3" />}
-                        title="Peça indisponível. Enviar para cotação de compra"
-                      >
-                        Enviar p/ Compras
-                      </Button>
-                   </div>
-                </div>
-              ))}
-           </div>
-         </div>
-      )}
-
-      {/* SECTION: Inbox - Solicitações de CADASTRO */}
-      {!isMechanicView && !viewOnly && !showPrice && pendingRequests.length > 0 && (
-        <div className="bg-gradient-to-r from-purple-50 to-white p-5 rounded-md border border-purple-200 shadow-sm animate-in fade-in slide-in-from-top-4">
-           <div className="flex items-center gap-2 mb-4">
-              <div className="bg-purple-100 p-2 rounded-full">
-                <Inbox className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                 <h3 className="text-lg font-bold text-gray-900">Solicitações de Cadastro Pendentes</h3>
-                 <p className="text-xs text-gray-500">Mecânicos solicitaram a inclusão destas peças no catálogo.</p>
-              </div>
-              <span className="ml-auto bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full">
-                {pendingRequests.length} novos
-              </span>
-           </div>
-
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pendingRequests.map(req => (
-                <div key={req.id} className="bg-white border border-purple-100 rounded-lg p-4 shadow-sm hover:shadow-lg transition-all relative overflow-hidden group hover:-translate-y-1">
-                   <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
-                      <PlusCircle className="w-12 h-12 text-purple-600" />
-                   </div>
-                   <div className="relative z-10">
-                     <p className="text-[10px] text-purple-600 font-bold uppercase mb-1">
-                       Solicitado por: {req.requesterName.split('(')[0]}
-                     </p>
-                     <p className="text-gray-800 font-medium text-sm line-clamp-2 italic mb-3">
-                       "{req.notes?.replace('SOLICITAÇÃO DE PEÇA NOVA: ', '')}"
-                     </p>
-                     <Button 
-                       size="sm" 
-                       onClick={() => onProcessRequest && onProcessRequest(req)}
-                       className="w-full bg-purple-600 hover:bg-purple-700 border-purple-600 text-xs shadow-sm hover:shadow"
-                       icon={<ArrowRight className="w-3 h-3" />}
-                       title="Iniciar cadastro com dados pré-preenchidos"
-                     >
-                       Cadastrar Agora
-                     </Button>
-                   </div>
-                </div>
-              ))}
-           </div>
-        </div>
-      )}
-
       {/* Brand Filter Bar */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 p-1">
-        <button
-          onClick={() => setFilterBrand('ALL')}
-          className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide border transition-all hover:scale-105 active:scale-95 ${
-            filterBrand === 'ALL' 
-              ? 'bg-gray-900 text-white border-gray-900 shadow-md' 
-              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900 shadow-sm'
-          }`}
-          title="Exibir todas as marcas"
-        >
-          Todas as Marcas
-        </button>
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x p-1 -mx-4 px-4 md:mx-0 md:px-0">
+        <button onClick={() => setFilterBrand('ALL')} className={`flex-shrink-0 snap-start px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide border transition-all ${filterBrand === 'ALL' ? 'bg-gray-900 text-white border-gray-900 shadow-md' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>Todas as Marcas</button>
         {availableBrands.map(brand => (
-          <button
-            key={brand}
-            onClick={() => setFilterBrand(brand)}
-            className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide border transition-all flex items-center gap-1 transform hover:scale-105 active:scale-95 ${
-              filterBrand === brand 
-                ? 'bg-red-600 text-white border-red-600 shadow-md' 
-                : 'bg-white text-gray-600 border-gray-300 hover:border-red-300 hover:text-red-600 hover:bg-red-50 shadow-sm'
-            }`}
-            title={`Filtrar por ${brand}`}
-          >
-            {brand === 'Mercedes-Benz' && <span className="font-serif">MB</span>}
-            {brand}
+          <button key={brand} onClick={() => setFilterBrand(brand)} className={`flex-shrink-0 snap-start px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide border transition-all flex items-center gap-1 ${filterBrand === brand ? 'bg-red-600 text-white border-red-600 shadow-md' : 'bg-white text-gray-600 border-gray-300 hover:text-red-600'}`}>
+            {brand === 'Mercedes-Benz' && <span className="font-serif">MB</span>}{brand}
           </button>
         ))}
       </div>
 
       {/* Advanced Search & Filters */}
-      <div className="bg-white p-5 rounded-md shadow-sm border border-gray-300 space-y-4">
-        {viewOnly && !showPrice && (
-          <div className="mb-2 bg-blue-50 text-blue-800 p-2 rounded text-xs font-bold border border-blue-200 flex items-center gap-2">
-            <Eye className="w-4 h-4"/> Modo de Consulta Ativo: Seleção de peças desabilitada.
-          </div>
-        )}
+      <div className="bg-white p-4 rounded-md shadow-sm border border-gray-300 space-y-4">
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder="Buscar SKU, Nome, Código OEM ou Fornecedor..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-shadow hover:shadow-sm"
-            title="Digite para pesquisar no catálogo"
-          />
+          <input type="text" placeholder="Buscar SKU, Nome, Código OEM ou Fornecedor..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-shadow hover:shadow-sm text-base" />
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        {/* Mobile Filter Toggle Button */}
+        <div className="md:hidden">
+           <button 
+             onClick={() => setShowMobileFilters(!showMobileFilters)} 
+             className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-200 rounded text-sm font-bold text-gray-700 active:bg-gray-100"
+           >
+             <span className="flex items-center gap-2"><Filter className="w-4 h-4"/> Filtros Avançados</span>
+             {showMobileFilters ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>}
+           </button>
+        </div>
+
+        {/* Collapsible Filter Section */}
+        <div className={`${showMobileFilters ? 'grid' : 'hidden'} md:grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2`}>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-gray-600 flex items-center gap-1 uppercase">
-              <Tag className="w-3 h-3" /> Categoria
-            </label>
-            <select 
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 hover:border-gray-400 cursor-pointer"
-              title="Filtrar por sistema ou categoria"
-            >
+            <label className="text-xs font-bold text-gray-600 flex items-center gap-1 uppercase"><Tag className="w-3 h-3" /> Categoria</label>
+            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="w-full px-3 py-3 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20">
               <option value="ALL">Todas</option>
-              {availableCategories.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-gray-600 flex items-center gap-1 uppercase">
-              <Filter className="w-3 h-3" /> Status
-            </label>
-            <select 
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 hover:border-gray-400 cursor-pointer"
-              title="Filtrar por disponibilidade"
-            >
+            <label className="text-xs font-bold text-gray-600 flex items-center gap-1 uppercase"><Filter className="w-3 h-3" /> Status</label>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full px-3 py-3 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20">
               <option value="ALL">Todos</option>
-              {Object.values(PartStatus).map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
+              {Object.values(PartStatus).map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-gray-600 flex items-center gap-1 uppercase">
-              <Calendar className="w-3 h-3" /> Data Cadastro
-            </label>
-            <input 
-              type="date" 
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 hover:border-gray-400"
-              title="Filtrar por data de criação"
-            />
+            <label className="text-xs font-bold text-gray-600 flex items-center gap-1 uppercase"><Calendar className="w-3 h-3" /> Data Cadastro</label>
+            <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="w-full px-3 py-3 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20" />
           </div>
-
-          {/* Botão de Solicitação de Peça para Mecânicos */}
           {isMechanicView && !viewOnly && onRequestRegistration && (
-            <div className="flex">
-               <Button 
-                variant="secondary"
-                onClick={() => setIsRequestPartModalOpen(true)}
-                className="w-full border-dashed border-red-300 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-400 transition-colors shadow-sm hover:shadow"
-                icon={<HelpCircle className="w-4 h-4"/>}
-                title="Abrir formulário de solicitação de peça nova"
-              >
-                Não encontrou? Solicitar Cadastro
-              </Button>
+            <div className="flex items-end">
+               <Button variant="secondary" onClick={() => setIsRequestPartModalOpen(true)} className="w-full h-[46px] border-dashed border-red-300 bg-red-50 text-red-700 hover:bg-red-100" icon={<HelpCircle className="w-4 h-4"/>}>Não encontrou? Solicitar</Button>
             </div>
           )}
         </div>
       </div>
 
-      {/* List */}
-      <div className="grid grid-cols-1 gap-4">
-        {filteredParts.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-md border border-dashed border-gray-300 flex flex-col items-center">
-            <p className="text-gray-500 font-medium mb-4">Nenhum registro encontrado.</p>
-            {isMechanicView && !viewOnly && onRequestRegistration && (
-               <Button 
-                onClick={() => setIsRequestPartModalOpen(true)}
-                icon={<PlusCircle className="w-4 h-4"/>}
-                title="Abrir formulário de solicitação de peça nova"
-                className="hover:shadow-md transition-shadow"
-              >
-                Solicitar Cadastro de Peça Nova
-              </Button>
-            )}
-          </div>
-        ) : (
-          filteredParts.map((part) => {
-            const isSelected = selectedIds.has(part.id);
-            return (
-              <div 
-                key={part.id} 
-                className={`bg-white p-5 rounded-md shadow-sm border transition-all duration-300 ease-in-out hover:shadow-lg hover:-translate-y-1 relative overflow-hidden group ${isSelected ? 'border-red-500 ring-1 ring-red-500 bg-red-50/10' : 'border-gray-200 hover:border-red-300'}`}
-              >
-                {/* Checkbox Area - HIDDEN IF VIEW ONLY */}
-                {!viewOnly && (
-                  <div 
-                    onClick={() => toggleSelection(part.id)}
-                    className="absolute top-0 left-0 bottom-0 w-12 cursor-pointer z-20 flex items-center justify-center hover:bg-gray-100/50 transition-colors border-r border-transparent group-hover:border-gray-100"
-                    title={isSelected ? "Deselecionar item" : "Selecionar item"}
-                  >
-                    {isSelected ? (
-                      <CheckSquare className="w-5 h-5 text-red-600" />
-                    ) : (
-                      <Square className="w-5 h-5 text-gray-300 group-hover:text-gray-500 transition-colors" />
-                    )}
-                  </div>
-                )}
-
-                <div className={`${viewOnly ? 'pl-0' : 'pl-10'} flex flex-col md:flex-row justify-between gap-6 relative z-10`}>
-                  
-                  {/* Image Thumbnail with Overlay */}
-                  <div className="flex-shrink-0 md:self-start">
-                    <div 
-                      className="w-full md:w-32 h-32 rounded bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center relative cursor-zoom-in group/image shadow-sm"
-                      onClick={() => part.imageUrl && openImage(part.imageUrl)}
-                      title="Clique para ampliar a imagem"
-                    >
-                      {part.imageUrl ? (
-                        <>
-                          <img 
-                            src={part.imageUrl} 
-                            alt={part.name} 
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover/image:scale-110" 
-                          />
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/image:opacity-100 transition-opacity">
-                             <Maximize2 className="w-8 h-8 text-white" />
-                          </div>
-                        </>
-                      ) : (
-                        <ImageOff className="w-8 h-8 text-gray-300" />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between flex-wrap gap-2">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200 uppercase tracking-widest">
-                            {part.category}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-widest ${getStatusColor(part.status)}`}>
-                            {part.status}
-                          </span>
-                        </div>
-                        <h3 className="font-bold text-lg text-gray-900">{part.name}</h3>
-                      </div>
-                      
-                      {/* Price Tag (Sales View) */}
-                      {showPrice && part.price && (
-                        <div className="text-right">
-                          <span className="block text-[10px] text-gray-500 uppercase font-bold">Preço Unitário</span>
-                          <span className="block text-xl font-bold text-green-700">R$ {part.price.toFixed(2)}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="bg-gray-50 p-3 rounded border border-gray-200 hover:border-gray-300 transition-colors">
-                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
-                          <Barcode className="w-3 h-3" /> SKU / OEM
-                        </p>
-                        <div className="flex justify-between items-baseline">
-                          <span className="text-xs text-gray-500">Interno:</span>
-                          <span className="font-mono font-bold text-sm text-gray-800">{part.internalCode}</span>
-                        </div>
-                        <div className="flex justify-between items-baseline mt-1 border-t border-gray-100 pt-1">
-                           <span className="text-xs text-gray-500">Original:</span>
-                           <span className="font-mono text-gray-600">{part.originalCode}</span>
-                        </div>
-                      </div>
-
-                      <div className="bg-white p-3 rounded border border-gray-200 hover:border-gray-300 transition-colors">
-                         <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1">Fabricante</p>
-                         <p className="font-semibold text-gray-800 text-sm truncate">{part.supplierName}</p>
-                         <p className="text-xs text-gray-500 truncate">{part.supplierEmail}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-4">
-                       <p className="text-sm text-gray-600 leading-relaxed line-clamp-2 border-l-2 border-gray-200 pl-3">
-                        {part.description}
-                       </p>
-                       
-                       {/* Compatible Brands Tags */}
-                       {part.compatibleBrands && part.compatibleBrands.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-3 ml-3">
-                            {part.compatibleBrands.map(brand => (
-                              <span key={brand} className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-200 transition-colors cursor-default">
-                                <Cog className="w-3 h-3" /> {brand}
-                              </span>
-                            ))}
-                          </div>
-                       )}
-                    </div>
-                  </div>
-
-                  <div className="flex md:flex-col gap-2 justify-start min-w-[140px] border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-4">
-                     <Button 
-                        variant="secondary" 
-                        size="sm" 
-                        onClick={() => {
-                          setZoomLevel(1);
-                          setViewingManualPart(part);
-                        }}
-                        className="w-full text-xs border-gray-300 text-gray-700 bg-white hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400 shadow-sm hover:shadow transition-all"
-                        icon={<FileText className="w-3.5 h-3.5" />}
-                        title="Ver manual técnico ou datasheet"
-                      >
-                        {part.manualUrl ? 'Abrir Manual' : 'Datasheet'}
-                      </Button>
-
-                      {/* Botão Reportar Erro */}
-                      {(isMechanicView || (viewOnly && !showPrice)) && onReportCorrection && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => openReportModal(part)}
-                          className="w-full text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border border-transparent hover:border-red-100 transition-colors"
-                          icon={<FileWarning className="w-3.5 h-3.5" />}
-                          title="Reportar problema no cadastro"
-                        >
-                          Reportar Erro
-                        </Button>
-                      )}
-                      
-                      {/* Botão Add to Cart (Vendas) */}
-                      {onAddToCart && (
-                        <Button 
-                          size="sm"
-                          onClick={() => onAddToCart(part)}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white border-none mt-auto shadow-md hover:shadow-lg transition-all hover:scale-105"
-                          icon={<Plus className="w-4 h-4" />}
-                          title="Adicionar item à venda atual"
-                        >
-                          Vender
-                        </Button>
-                      )}
-
-                      {canEdit && !viewOnly && !showPrice && (
-                        <div className="flex gap-2 w-full mt-auto">
-                          <Button 
-                            variant="ghost" 
-                            className="flex-1 text-gray-500 border border-gray-200 rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors" 
-                            title="Editar informações da peça"
-                            onClick={() => onEdit && onEdit(part.id)}
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            className="flex-1 text-red-600 hover:text-white hover:bg-red-600 border border-gray-200 rounded hover:border-red-600 transition-colors" 
-                            onClick={() => onDelete(part.id)} 
-                            title="Remover peça do estoque"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      )}
-                  </div>
+      {/* Inbox Sections (Estoque Only) */}
+      {!isMechanicView && canEdit && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+           {pendingRequests.length > 0 && (
+             <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 shadow-sm animate-pulse">
+                <div className="flex items-center gap-2 mb-3 text-purple-800 font-bold uppercase text-xs tracking-wider border-b border-purple-200 pb-2">
+                  <Inbox className="w-4 h-4" /> Solicitações de Cadastro
                 </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* Floating Order Bar - HIDDEN IF VIEW ONLY OR SALES MODE */}
-      {!viewOnly && !showPrice && selectedIds.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900 border-t border-gray-800 shadow-2xl z-30 animate-in slide-in-from-bottom-10">
-          <div className="max-w-6xl mx-auto flex items-center justify-between text-white">
-            <div className="flex items-center gap-4">
-              <div className="bg-red-600 text-white w-10 h-10 rounded flex items-center justify-center font-bold shadow-lg border border-red-500 animate-bounce">
-                {selectedIds.size}
-              </div>
-              <div className="flex flex-col">
-                <span className="font-bold text-gray-100">Itens Selecionados</span>
-                <span className="text-xs text-gray-400">{canEdit ? 'Prontos para requisição' : 'Solicitação de Peças para Reparo'}</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-gray-800" onClick={clearSelection} title="Limpar seleção atual">Cancelar</Button>
-              <Button 
-                variant="primary"
-                onClick={() => setIsOrderModalOpen(true)}
-                icon={<ShoppingCart className="w-4 h-4" />}
-                className="bg-white text-gray-900 hover:bg-gray-100 border-none font-bold hover:scale-105 transition-transform"
-                title="Revisar e confirmar o pedido"
-              >
-                Revisar {canEdit ? 'Pedido' : 'Solicitação'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ... (Modals remain unchanged, just ensuring they don't break) ... */}
-      {viewingManualPart && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white w-full max-w-5xl h-[85vh] rounded shadow-2xl overflow-hidden flex flex-col">
-            <div className="p-3 border-b border-gray-300 flex justify-between items-center bg-gray-50">
-              <div className="flex items-center gap-3">
-                <div className="bg-gray-200 p-2 rounded">
-                  <FileText className="w-5 h-5 text-gray-700" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-gray-900">Documentação Técnica Oficial</h3>
-                  <p className="text-xs text-gray-500 flex items-center gap-2 font-mono">
-                    <span className="bg-gray-200 px-1 rounded">{viewingManualPart.internalCode}</span>
-                    <span>{viewingManualPart.originalCode}</span>
-                    {viewingManualPart.manualUrl && <span className="text-green-600 font-bold ml-2">• Manual Carregado</span>}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                 {!viewingManualPart.manualUrl?.includes('.pdf') && (
-                   <>
-                    <button onClick={() => setZoomLevel(z => Math.max(0.5, z - 0.25))} className="p-1.5 hover:bg-gray-200 rounded border border-gray-300 bg-white" title="Diminuir Zoom"><ZoomOut className="w-4 h-4" /></button>
-                    <span className="text-xs font-mono w-12 text-center font-bold text-gray-600">{Math.round(zoomLevel * 100)}%</span>
-                    <button onClick={() => setZoomLevel(z => Math.min(3, z + 0.25))} className="p-1.5 hover:bg-gray-200 rounded border border-gray-300 bg-white" title="Aumentar Zoom"><ZoomIn className="w-4 h-4" /></button>
-                    <div className="h-6 w-px bg-gray-300 mx-2"></div>
-                   </>
-                 )}
-                <button onClick={() => setViewingManualPart(null)} className="p-2 hover:bg-red-600 hover:text-white rounded" title="Fechar visualizador"><X className="w-5 h-5" /></button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-hidden relative bg-gray-200 flex items-center justify-center shadow-inner">
-               <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: `linear-gradient(#64748b 1px, transparent 1px), linear-gradient(90deg, #64748b 1px, transparent 1px)`, backgroundSize: '40px 40px' }}></div>
-               {viewingManualPart.manualUrl ? (
-                 viewingManualPart.manualUrl.startsWith('data:image') ? (
-                    <div className="transition-transform duration-200 ease-out origin-center p-4 bg-white shadow-xl max-w-[90%] max-h-[90%] overflow-auto border border-gray-400" style={{ transform: `scale(${zoomLevel})` }}>
-                       <img src={viewingManualPart.manualUrl} alt="Manual" className="max-w-full h-auto" />
-                    </div>
-                 ) : (
-                    <div className="w-full h-full bg-white p-4">
-                       <iframe src={viewingManualPart.manualUrl} className="w-full h-full border-0" title="Manual Viewer"></iframe>
-                    </div>
-                 )
-               ) : (
-                 <div className="transition-transform duration-200 ease-out origin-center p-8 bg-white shadow-xl max-w-[90%] max-h-[90%] overflow-auto border border-gray-400" style={{ transform: `scale(${zoomLevel})` }}>
-                   <div className="relative">
-                      <div className="absolute top-0 left-0 border border-black px-2 py-0.5 font-mono font-bold text-[10px] bg-white text-black">REF: {viewingManualPart.originalCode}</div>
-                      <img src={`https://placehold.co/800x600/ffffff/000000?text=MANUAL+NAO+CADASTRADO\n${viewingManualPart.category.toUpperCase()}&font=roboto`} alt="Esquema Técnico Genérico" className="max-w-full h-auto object-contain grayscale" draggable={false} />
-                   </div>
-                 </div>
-               )}
-            </div>
-
-            <div className="p-3 bg-white border-t border-gray-200 flex justify-between items-center text-xs text-gray-500">
-               <p className="font-mono">{viewingManualPart.manualUrl ? 'DOCUMENTO CARREGADO' : 'VISUALIZAÇÃO GENÉRICA'}</p>
-               {!viewOnly && !showPrice && (
-                  <Button size="sm" onClick={() => { if (!selectedIds.has(viewingManualPart.id)) { toggleSelection(viewingManualPart.id); } setViewingManualPart(null); }} icon={selectedIds.has(viewingManualPart.id) ? <CheckCircle2 className="w-3 h-3"/> : <CheckSquare className="w-3 h-3"/>} variant={selectedIds.has(viewingManualPart.id) ? "secondary" : "primary"}>
-                    {selectedIds.has(viewingManualPart.id) ? "ITEM SELECIONADO" : "ADICIONAR AO PEDIDO"}
-                  </Button>
-               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirmation Modal - Only shown if logic allows */}
-      {!viewOnly && !showPrice && isOrderModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-           <div className="bg-white w-full max-w-2xl rounded shadow-2xl overflow-hidden p-0 border border-gray-400 max-h-[95vh] flex flex-col">
-              {/* ... (Existing Modal Content) ... */}
-              <div className="bg-gray-900 p-4 flex items-center gap-3 border-b border-gray-800 shrink-0">
-                <ShoppingCart className="w-6 h-6 text-red-500" />
-                <h2 className="text-lg font-bold text-white">Confirmação de {canEdit ? 'Requisição' : 'Solicitação'}</h2>
-              </div>
-              
-              <div className="p-6 space-y-4 overflow-y-auto">
-                 {/* ... (Same as before, reusing existing logic) ... */}
-                 {isMechanicView && (
-                    <div className="bg-orange-50 p-4 rounded border border-orange-200 space-y-4 mb-2">
-                       {/* Vehicle Fields */}
-                       <h4 className="text-xs font-bold uppercase text-orange-800 flex items-center gap-1 border-b border-orange-200 pb-1">
-                         <Bus className="w-4 h-4" /> Identificação do Veículo
-                       </h4>
-                       <div className="grid grid-cols-2 gap-4 relative">
-                          <div className="col-span-2 sm:col-span-1">
-                            <Input label="Prefixo (Nº Carro)" value={vehicleData.prefix} onChange={(e) => setVehicleData({...vehicleData, prefix: e.target.value})} onBlur={handlePrefixBlur} placeholder="Digite e tecle Tab" required className="font-bold text-gray-900" icon={<Search className="w-3 h-3 text-orange-500"/>} />
-                          </div>
-                          <div className="col-span-2 border-t border-orange-200 my-1 pt-1"></div>
-                          <div className="col-span-2 grid grid-cols-2 gap-4 opacity-80">
-                             <Input label="Placa" value={vehicleData.plate} readOnly className="bg-gray-100 text-gray-500 cursor-not-allowed" />
-                             <Input label="Modelo" value={vehicleData.model} readOnly className="bg-gray-100 text-gray-500 cursor-not-allowed" />
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {pendingRequests.map(req => (
+                    <div key={req.id} className="bg-white p-3 rounded border border-purple-100 shadow-sm">
+                       <p className="text-sm font-bold text-gray-800">{req.notes}</p>
+                       <div className="flex justify-between items-center mt-2">
+                          <span className="text-[10px] text-gray-500">{req.requesterName}</span>
+                          <div className="flex gap-2">
+                             <button onClick={() => onOrderAction?.(req.id, 'REJECT')} className="text-red-600 hover:text-red-800 text-[10px] font-bold uppercase" title="Rejeitar Solicitação">Rejeitar</button>
+                             <button onClick={() => onProcessRequest?.(req)} className="text-purple-600 hover:text-purple-800 text-[10px] font-bold uppercase" title="Cadastrar Peça Agora">Cadastrar</button>
                           </div>
                        </div>
                     </div>
+                  ))}
+                </div>
+             </div>
+           )}
+
+           {pendingCorrections.length > 0 && (
+             <div className="bg-red-50 border border-red-200 rounded-lg p-4 shadow-sm">
+                <div className="flex items-center gap-2 mb-3 text-red-800 font-bold uppercase text-xs tracking-wider border-b border-red-200 pb-2">
+                  <FileWarning className="w-4 h-4" /> Reportes de Erro
+                </div>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {pendingCorrections.map(req => (
+                    <div key={req.id} className="bg-white p-3 rounded border border-red-100 shadow-sm">
+                       <p className="text-sm font-bold text-gray-800">{req.items[0]?.partName}</p>
+                       <p className="text-xs text-red-600 italic">"{req.notes}"</p>
+                       <div className="flex justify-end items-center mt-2">
+                          <button onClick={() => onOrderAction?.(req.id, 'RESOLVE_CORRECTION')} className="text-green-600 hover:text-green-800 text-[10px] font-bold uppercase flex items-center gap-1" title="Marcar como Resolvido"><CheckCircle2 className="w-3 h-3"/> Resolvido</button>
+                       </div>
+                    </div>
+                  ))}
+                </div>
+             </div>
+           )}
+
+           {pendingOrders.length > 0 && (
+             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 shadow-sm">
+                <div className="flex items-center gap-2 mb-3 text-yellow-800 font-bold uppercase text-xs tracking-wider border-b border-yellow-200 pb-2">
+                  <PackageCheck className="w-4 h-4" /> Requisições de Peças
+                </div>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {pendingOrders.map(order => (
+                    <div key={order.id} className="bg-white p-3 rounded border border-yellow-100 shadow-sm">
+                       <div className="flex justify-between items-start">
+                          <div>
+                             <p className="text-xs font-bold text-gray-500">{order.requesterName}</p>
+                             <p className="text-sm font-bold text-gray-800">{order.items.length} itens</p>
+                          </div>
+                          {order.priority === 'URGENTE' && <span className="bg-red-100 text-red-800 text-[10px] px-1.5 py-0.5 rounded font-bold">URGENTE</span>}
+                       </div>
+                       <div className="flex gap-2 mt-2">
+                          <button onClick={() => onOrderAction?.(order.id, 'DELIVER')} className="flex-1 bg-green-100 hover:bg-green-200 text-green-800 text-[10px] font-bold py-1 rounded transition-colors" title="Entregar do Estoque">Atender</button>
+                          <button onClick={() => onOrderAction?.(order.id, 'FORWARD_PURCHASING')} className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-800 text-[10px] font-bold py-1 rounded transition-colors" title="Sem estoque, comprar">Comprar</button>
+                       </div>
+                    </div>
+                  ))}
+                </div>
+             </div>
+           )}
+        </div>
+      )}
+
+      {/* Results Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+        {filteredParts.length === 0 ? (
+          <div className="col-span-full py-12 text-center text-gray-500 bg-white rounded-md border border-dashed border-gray-300">
+            <Search className="w-12 h-12 mx-auto mb-2 opacity-20" />
+            <p>Nenhuma peça encontrada.</p>
+          </div>
+        ) : (
+          filteredParts.map((part) => {
+            const images = getPartImages(part);
+            const mainImage = images[0];
+            return (
+            <div key={part.id} className={`group bg-white rounded-xl border transition-all duration-300 flex flex-col overflow-hidden relative ${selectedIds.has(part.id) ? 'border-red-600 ring-2 ring-red-100 shadow-lg' : 'border-gray-200 hover:border-red-300 hover:shadow-lg hover:-translate-y-1'}`}>
+              
+              {/* Card Image Area */}
+              <div className="relative h-40 bg-gray-100 border-b border-gray-100 group">
+                 {mainImage ? (
+                   <>
+                     <img src={mainImage} alt={part.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                     <div 
+                       className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center cursor-pointer"
+                       onClick={() => openImage(images)}
+                       title="Ampliar Imagem"
+                     >
+                        <div className="bg-white/90 p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
+                           <ZoomIn className="w-5 h-5 text-gray-700" />
+                        </div>
+                     </div>
+                     {images.length > 1 && (
+                       <div className="absolute bottom-2 right-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                         <ImageOff className="w-3 h-3 rotate-180" /> +{images.length - 1}
+                       </div>
+                     )}
+                   </>
+                 ) : (
+                   <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                     <ImageOff className="w-8 h-8 mb-1 opacity-50" />
+                     <span className="text-[10px] uppercase font-bold">Sem Foto</span>
+                   </div>
+                 )}
+                 
+                 {/* Status Badge */}
+                 <div className="absolute top-2 right-2">
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold border shadow-sm ${part.status === PartStatus.IN_STOCK ? 'bg-green-100 text-green-800 border-green-200' : part.status === PartStatus.LOW_STOCK ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-red-100 text-red-800 border-red-200'}`}>
+                      {part.status}
+                    </span>
+                 </div>
+              </div>
+
+              {/* Card Body */}
+              <div className="p-4 flex-1 flex flex-col">
+                <div className="flex justify-between items-start mb-2">
+                   <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-900 text-sm leading-tight line-clamp-2 mb-1" title={part.name}>{part.name}</h3>
+                      <div className="flex items-center gap-2">
+                         <span className="text-[10px] font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 border border-gray-200" title="Código Interno">{part.internalCode}</span>
+                         {part.originalCode && <span className="text-[10px] font-mono text-gray-400 truncate" title="Código Original (OEM)">OEM: {part.originalCode}</span>}
+                      </div>
+                   </div>
+                </div>
+
+                <div className="mt-auto pt-3 border-t border-gray-50 flex items-center justify-between">
+                   <div className="text-xs text-gray-500">
+                      <p className="line-clamp-1" title={part.supplierName}>{part.supplierName}</p>
+                      <p className="text-[10px] text-gray-400">{part.category}</p>
+                   </div>
+                   
+                   {/* Price Display */}
+                   {showPrice && part.price && (
+                     <div className="text-right">
+                       <span className="text-[10px] text-gray-400 block">Preço Unit.</span>
+                       <span className="text-lg font-bold text-green-700">R$ {part.price.toFixed(2)}</span>
+                     </div>
+                   )}
+                </div>
+              </div>
+
+              {/* Card Actions Footer */}
+              <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2">
+                 
+                 {/* Selection Checkbox Area */}
+                 {!viewOnly && (
+                   <div 
+                     className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors ${selectedIds.has(part.id) ? 'bg-red-50 text-red-700' : 'hover:bg-gray-200 text-gray-500'}`}
+                     onClick={() => toggleSelection(part.id)}
+                     title={selectedIds.has(part.id) ? "Desmarcar item" : "Selecionar para pedido"}
+                   >
+                      {selectedIds.has(part.id) ? <CheckSquare className="w-5 h-5"/> : <Square className="w-5 h-5"/>}
+                      {selectedIds.has(part.id) && (
+                        <input 
+                          type="number" 
+                          min="1" 
+                          className="w-10 text-xs text-center border border-red-200 rounded focus:outline-none focus:border-red-500 bg-white"
+                          value={quantities[part.id] || 1}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => updateQuantity(part.id, parseInt(e.target.value))}
+                        />
+                      )}
+                   </div>
                  )}
 
-                  <div className="max-h-60 overflow-y-auto border border-gray-200 rounded bg-gray-50 divide-y divide-gray-200">
-                    {parts.filter(p => selectedIds.has(p.id)).map(part => (
-                      <div key={part.id} className="p-3 flex justify-between items-center hover:bg-white transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 min-w-0 pr-2">
-                            <p className="font-bold text-gray-800 text-sm truncate">{part.name}</p>
-                            <p className="text-xs text-gray-500 font-mono">{part.internalCode}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                           <input title="Definir quantidade" type="number" min="1" value={quantities[part.id] || 1} onChange={(e) => updateQuantity(part.id, parseInt(e.target.value))} className="w-16 px-2 py-1 text-xs border border-gray-300 rounded text-center" />
-                           <button title="Remover item da lista" onClick={() => toggleSelection(part.id)} className="text-gray-400 hover:text-red-600 p-1"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                      </div>
-                    ))}
+                 {/* Sales Add to Cart */}
+                 {showPrice && onAddToCart && (
+                   <Button 
+                     size="sm" 
+                     onClick={() => onAddToCart(part)} 
+                     className="bg-green-600 hover:bg-green-700 flex-1 h-8 text-xs"
+                     icon={<ShoppingCart className="w-3 h-3" />}
+                     title="Adicionar ao Carrinho de Vendas"
+                   >
+                     Vender
+                   </Button>
+                 )}
+
+                 {/* Action Buttons */}
+                 <div className="flex items-center gap-1 ml-auto">
+                    {part.manualUrl && (
+                      <button onClick={() => window.open(part.manualUrl, '_blank')} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Ver Manual Técnico / Datasheet">
+                        <FileText className="w-4 h-4" />
+                      </button>
+                    )}
+                    
+                    {isMechanicView && onReportCorrection && (
+                      <button onClick={() => openReportModal(part)} className="p-1.5 text-orange-600 hover:bg-orange-50 rounded" title="Reportar erro no cadastro">
+                        <FileWarning className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {canEdit && onEdit && (
+                      <button onClick={() => onEdit(part.id)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Editar informações da peça">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    )}
+                    {canEdit && (
+                      <button onClick={() => onDelete(part.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Excluir peça do sistema">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                 </div>
+              </div>
+            </div>
+          )})
+        )}
+      </div>
+
+      {/* Floating Action Bar (Order) */}
+      {!viewOnly && selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-6 border-2 border-white/20 animate-in slide-in-from-bottom-4">
+           <div className="flex items-center gap-3">
+              <span className="bg-red-600 text-white font-bold px-2 py-0.5 rounded text-sm">{selectedIds.size}</span>
+              <span className="text-sm font-medium">itens selecionados</span>
+           </div>
+           
+           <div className="h-6 w-px bg-gray-700"></div>
+           
+           <button onClick={clearSelection} className="text-xs text-gray-400 hover:text-white uppercase font-bold tracking-wider">Cancelar</button>
+           <button onClick={() => setIsOrderModalOpen(true)} className="bg-white text-gray-900 hover:bg-gray-100 px-6 py-2 rounded-full font-bold text-sm shadow-md transition-transform hover:scale-105 flex items-center gap-2">
+             <ShoppingCart className="w-4 h-4" /> Finalizar Pedido
+           </button>
+        </div>
+      )}
+
+      {/* Modal: Image Viewer */}
+      {expandedImages.length > 0 && (
+        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center animate-in fade-in backdrop-blur-sm" onClick={closeImage}>
+           <div className="relative w-full h-full flex items-center justify-center overflow-hidden cursor-move"
+                onWheel={handleImageWheel}
+                onMouseDown={handleImageMouseDown}
+                onMouseMove={handleImageMouseMove}
+                onMouseUp={handleImageMouseUp}
+                onMouseLeave={handleImageMouseUp}
+           >
+              <img 
+                src={expandedImages[currentImageIndex]} 
+                alt="Expanded" 
+                className="max-w-none transition-transform duration-75 ease-linear"
+                style={{ transform: `translate(${imgPos.x}px, ${imgPos.y}px) scale(${imgZoom})` }}
+                draggable={false}
+              />
+              
+              {/* Image Navigation (if multiple) */}
+              {expandedImages.length > 1 && (
+                <>
+                  <button className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 rounded-full hover:bg-white/40 text-white" onClick={prevImage}>
+                    <ChevronLeft className="w-8 h-8"/>
+                  </button>
+                  <button className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 rounded-full hover:bg-white/40 text-white" onClick={nextImage}>
+                    <ChevronRight className="w-8 h-8"/>
+                  </button>
+                  <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-black/50 px-3 py-1 rounded-full text-white text-xs font-bold pointer-events-none">
+                    {currentImageIndex + 1} / {expandedImages.length}
                   </div>
+                </>
+              )}
+
+              {/* Controls */}
+              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-gray-800/80 backdrop-blur text-white px-4 py-2 rounded-full flex gap-4 shadow-lg border border-gray-700" onClick={(e) => e.stopPropagation()}>
+                 <button onClick={() => setImgZoom(z => Math.max(0.5, z - 0.25))}><ZoomOut className="w-5 h-5"/></button>
+                 <span className="font-mono text-sm w-12 text-center">{Math.round(imgZoom * 100)}%</span>
+                 <button onClick={() => setImgZoom(z => Math.min(5, z + 0.25))}><ZoomIn className="w-5 h-5"/></button>
+                 <div className="w-px h-6 bg-gray-600"></div>
+                 <button onClick={resetImageTransform} title="Resetar"><RotateCcw className="w-5 h-5"/></button>
+                 <button onClick={closeImage} title="Fechar"><X className="w-5 h-5"/></button>
               </div>
 
-              <div className="p-6 pt-0 flex gap-3 mt-auto bg-white">
-                <Button variant="secondary" className="flex-1" onClick={() => setIsOrderModalOpen(false)}>Retornar</Button>
-                <Button className="flex-1" onClick={handleFinishOrder}>{canEdit ? 'Enviar para Compras' : 'Solicitar ao Estoque'}</Button>
+              <div className="absolute top-4 left-4 text-white/50 text-xs pointer-events-none">
+                 <p className="flex items-center gap-2"><Move className="w-4 h-4"/> Arraste para mover</p>
+                 <p className="flex items-center gap-2 mt-1"><Maximize2 className="w-4 h-4"/> Scroll para zoom</p>
               </div>
            </div>
         </div>
       )}
-      
-      {/* Modais de Cadastro e Reporte (Mantidos) */}
-      {isRequestPartModalOpen && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-           <div className="bg-white w-full max-w-lg rounded shadow-2xl p-6">
-             <div className="flex justify-between items-center mb-4 border-b border-gray-200 pb-2">
-                <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><HelpCircle className="w-5 h-5 text-red-600" /> Solicitar Cadastro</h3>
-                <button onClick={() => setIsRequestPartModalOpen(false)}><X className="w-5 h-5 text-gray-400" /></button>
-             </div>
-             <textarea className="w-full border border-gray-300 rounded p-3 text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-600 outline-none" rows={4} placeholder="Descreva a peça..." value={requestPartDescription} onChange={(e) => setRequestPartDescription(e.target.value)} />
-             <div className="flex justify-end gap-3 mt-4">
-                <Button variant="secondary" onClick={() => setIsRequestPartModalOpen(false)}>Cancelar</Button>
-                <Button onClick={handleSubmitRegistrationRequest}>Enviar</Button>
-             </div>
-           </div>
-         </div>
-      )}
 
-      {/* Reporte de Erro Modal */}
-      {isReportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-           <div className="bg-white w-full max-w-lg rounded shadow-2xl p-6 border-l-4 border-red-600">
-             <div className="flex justify-between items-center mb-4 border-b border-gray-200 pb-2">
-                <div>
-                   <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">Reportar Inconsistência</h3>
-                   <p className="text-xs text-gray-500">Notificar o almoxarifado sobre erros neste cadastro.</p>
+      {/* Modal: Confirm Order */}
+      {isOrderModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+           <div className="bg-white p-8 rounded-lg shadow-2xl max-w-lg w-full border-t-4 border-red-600">
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                <ShoppingCart className="w-6 h-6 text-red-600" /> Confirmar Requisição
+              </h2>
+              
+              <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-6 max-h-40 overflow-y-auto">
+                 <h3 className="text-xs font-bold text-gray-500 uppercase mb-2">Resumo do Pedido</h3>
+                 <ul className="space-y-2 text-sm">
+                   {Array.from(selectedIds).map(id => {
+                     const part = parts.find(p => p.id === id);
+                     return (
+                       <li key={id} className="flex justify-between">
+                         <span className="truncate max-w-[250px]">{part?.name}</span>
+                         <span className="font-bold font-mono">x{quantities[id] || 1}</span>
+                       </li>
+                     );
+                   })}
+                 </ul>
+              </div>
+
+              {isMechanicView && (
+                <div className="space-y-4 mb-6">
+                   <h3 className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
+                     <Bus className="w-3 h-3" /> Dados do Veículo (Obrigatório)
+                   </h3>
+                   <div className="grid grid-cols-3 gap-3">
+                      <Input 
+                        label="Prefixo" 
+                        value={vehicleData.prefix} 
+                        onChange={(e) => setVehicleData({...vehicleData, prefix: e.target.value})}
+                        onBlur={handlePrefixBlur}
+                        placeholder="Ex: 567"
+                        required
+                        className="font-bold bg-yellow-50 border-yellow-200"
+                      />
+                      <div className="col-span-2">
+                        <Input 
+                          label="Placa" 
+                          value={vehicleData.plate} 
+                          onChange={(e) => setVehicleData({...vehicleData, plate: e.target.value})}
+                          readOnly
+                          className="bg-gray-100 text-gray-500 cursor-not-allowed"
+                        />
+                      </div>
+                   </div>
+                   <div className="grid grid-cols-2 gap-3">
+                      <Input label="Modelo" value={vehicleData.model} readOnly className="bg-gray-100 text-gray-500 text-xs" />
+                      <Input label="VIN" value={vehicleData.vin} readOnly className="bg-gray-100 text-gray-500 text-xs" />
+                   </div>
+
+                   <div className="pt-2 border-t border-gray-100">
+                      <h3 className="text-xs font-bold text-gray-500 uppercase mb-2">Detalhes da Manutenção</h3>
+                      <div className="grid grid-cols-1 gap-3">
+                         <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-bold text-gray-700 uppercase">Sistema Afetado</label>
+                            <select 
+                              value={maintenanceSystem} 
+                              onChange={(e) => setMaintenanceSystem(e.target.value as MaintenanceSystem)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
+                            >
+                              {Object.values(MaintenanceSystem).map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                         </div>
+                         <Input 
+                           label="Motivo / Diagnóstico" 
+                           value={maintenanceNotes} 
+                           onChange={(e) => setMaintenanceNotes(e.target.value)} 
+                           placeholder="Ex: Vazamento de óleo, Desgaste natural..." 
+                         />
+                      </div>
+                   </div>
                 </div>
-                <button onClick={() => setIsReportModalOpen(false)}><X className="w-5 h-5 text-gray-400" /></button>
-             </div>
-             <div className="mb-4 bg-gray-50 p-3 rounded text-sm">
-                <span className="font-bold block text-gray-700">Peça: {reportPart?.name}</span>
-                <span className="font-mono text-gray-500 text-xs">SKU: {reportPart?.internalCode}</span>
-             </div>
-             <textarea 
-               className="w-full border border-gray-300 rounded p-3 text-sm focus:ring-2 focus:ring-red-500/20 focus:border-red-600 outline-none" 
-               rows={4} 
-               placeholder="Descreva o erro (Ex: Foto incorreta, código OEM errado, descrição incompleta...)" 
-               value={reportNotes} 
-               onChange={(e) => setReportNotes(e.target.value)} 
-             />
-             <div className="flex justify-end gap-3 mt-4">
-                <Button variant="secondary" onClick={() => setIsReportModalOpen(false)}>Cancelar</Button>
-                <Button onClick={handleSubmitReport} className="bg-red-600 hover:bg-red-700 border-red-600">Enviar Reporte</Button>
-             </div>
+              )}
+
+              <div className="mb-6">
+                 <h3 className="text-xs font-bold text-gray-500 uppercase mb-2">Nível de Prioridade</h3>
+                 <div className="flex gap-2">
+                    <button 
+                      onClick={() => setOrderPriority('NORMAL')}
+                      className={`flex-1 py-2 rounded font-bold text-sm border ${orderPriority === 'NORMAL' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-500 border-gray-200'}`}
+                    >
+                      Normal
+                    </button>
+                    <button 
+                      onClick={() => setOrderPriority('URGENTE')}
+                      className={`flex-1 py-2 rounded font-bold text-sm border flex items-center justify-center gap-2 ${orderPriority === 'URGENTE' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-500 border-gray-200'}`}
+                    >
+                      <AlertTriangle className="w-4 h-4" /> Urgente
+                    </button>
+                 </div>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                 <Button variant="secondary" onClick={() => setIsOrderModalOpen(false)}>Cancelar</Button>
+                 <Button onClick={handleFinishOrder}>Confirmar Pedido</Button>
+              </div>
            </div>
         </div>
       )}
 
-      {/* --- Visualizador de Imagem Expandida (Interactive Zoom & Pan) --- */}
-      {expandedImage && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in">
-          <div className="w-full h-full flex flex-col relative overflow-hidden">
-            
-            {/* Header / Controls */}
-            <div className="absolute top-0 left-0 right-0 p-4 z-50 flex justify-between items-start pointer-events-none">
-               <div className="bg-white/10 backdrop-blur p-2 rounded-lg text-white pointer-events-auto flex gap-2 shadow-lg border border-white/20">
-                  <button onClick={() => handleImageWheel({ deltaY: 1000 } as any)} className="p-2 hover:bg-white/20 rounded" title="Reduzir Zoom (-)">
-                    <ZoomOut className="w-5 h-5" />
-                  </button>
-                  <span className="flex items-center justify-center w-12 font-mono text-sm font-bold border-x border-white/20">
-                    {Math.round(imgZoom * 100)}%
-                  </span>
-                  <button onClick={() => handleImageWheel({ deltaY: -1000 } as any)} className="p-2 hover:bg-white/20 rounded" title="Aumentar Zoom (+)">
-                    <ZoomIn className="w-5 h-5" />
-                  </button>
-                  <div className="w-px bg-white/20 mx-1"></div>
-                  <button onClick={resetImageTransform} className="p-2 hover:bg-white/20 rounded" title="Resetar Visualização">
-                    <RotateCcw className="w-5 h-5" />
-                  </button>
-               </div>
-               
-               <button 
-                 onClick={closeImage} 
-                 className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full shadow-lg pointer-events-auto transition-transform hover:scale-110"
-                 title="Fechar (Esc)"
-               >
-                 <X className="w-6 h-6" />
-               </button>
-            </div>
+      {/* Modal: Request New Part */}
+      {isRequestPartModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+           <div className="bg-white p-6 rounded-lg shadow-2xl max-w-md w-full border-t-4 border-purple-600">
+              <h2 className="text-lg font-bold mb-2 flex items-center gap-2 text-purple-800">
+                <HelpCircle className="w-5 h-5" /> Solicitar Cadastro de Peça
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Descreva a peça que você não encontrou. O setor de compras/estoque será notificado.
+              </p>
+              
+              <textarea 
+                className="w-full h-32 p-3 border border-gray-300 rounded focus:outline-none focus:border-purple-500 text-sm mb-4"
+                placeholder="Ex: Filtro de ar para o novo ônibus Volvo (não achei pelo código)..."
+                value={requestPartDescription}
+                onChange={(e) => setRequestPartDescription(e.target.value)}
+              />
 
-            {/* Hint Overlay */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur px-4 py-2 rounded-full text-white text-xs font-bold pointer-events-none z-50 border border-white/10 flex items-center gap-2">
-               <Move className="w-4 h-4" />
-               <span>Clique e arraste para mover • Scroll para zoom</span>
-            </div>
-
-            {/* Image Canvas */}
-            <div 
-              className="flex-1 flex items-center justify-center overflow-hidden cursor-move select-none"
-              onWheel={handleImageWheel}
-              onMouseDown={handleImageMouseDown}
-              onMouseMove={handleImageMouseMove}
-              onMouseUp={handleImageMouseUp}
-              onMouseLeave={handleImageMouseUp}
-              title="Clique e arraste para mover a imagem"
-            >
-               <img 
-                 src={expandedImage} 
-                 alt="Expanded View" 
-                 className="max-w-none transition-transform duration-75 ease-linear origin-center shadow-2xl"
-                 style={{ 
-                   transform: `translate(${imgPos.x}px, ${imgPos.y}px) scale(${imgZoom})`,
-                   maxHeight: '90vh',
-                   maxWidth: '90vw'
-                 }}
-                 draggable={false}
-               />
-            </div>
-          </div>
+              <div className="flex justify-end gap-2">
+                 <Button variant="secondary" onClick={() => setIsRequestPartModalOpen(false)}>Cancelar</Button>
+                 <Button className="bg-purple-600 hover:bg-purple-700" onClick={handleSubmitRegistrationRequest}>Enviar Solicitação</Button>
+              </div>
+           </div>
         </div>
       )}
 
+      {/* Modal: Report Correction */}
+      {isReportModalOpen && reportPart && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+           <div className="bg-white p-6 rounded-lg shadow-2xl max-w-md w-full border-t-4 border-orange-500">
+              <h2 className="text-lg font-bold mb-2 flex items-center gap-2 text-orange-800">
+                <FileWarning className="w-5 h-5" /> Reportar Inconsistência
+              </h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Identificou um erro no cadastro da peça <strong>{reportPart.name}</strong>?
+              </p>
+              
+              <textarea 
+                className="w-full h-32 p-3 border border-gray-300 rounded focus:outline-none focus:border-orange-500 text-sm mb-4"
+                placeholder="Ex: O código OEM está errado, a foto não corresponde à peça, ou a descrição está incompleta..."
+                value={reportNotes}
+                onChange={(e) => setReportNotes(e.target.value)}
+              />
+
+              <div className="flex justify-end gap-2">
+                 <Button variant="secondary" onClick={() => setIsReportModalOpen(false)}>Cancelar</Button>
+                 <Button className="bg-orange-600 hover:bg-orange-700" onClick={handleSubmitReport}>Enviar Reporte</Button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };

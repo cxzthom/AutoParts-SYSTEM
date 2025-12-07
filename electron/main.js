@@ -15,7 +15,7 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 768,
-    title: 'AutoParts ERP - Enterprise Edition',
+    title: 'MEC System - Enterprise Edition',
     icon: path.join(__dirname, '../public/favicon.ico'),
     webPreferences: {
       nodeIntegration: false,

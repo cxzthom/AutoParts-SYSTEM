@@ -55,7 +55,8 @@ export interface AutoPart {
   status: PartStatus;
   description: string;
   createdAt: string;
-  imageUrl?: string; // URL da imagem (Base64 ou Link externo)
+  imageUrl?: string; // Legacy: URL da imagem única (Mantido para compatibilidade)
+  imageUrls?: string[]; // Novo: Array de URLs (Base64) - Limite 4
   manualUrl?: string; // URL do Manual Técnico / PDF
   compatibleBrands?: string[]; // Marcas compatíveis (ex: Volvo, Mercedes)
   price?: number; // Preço de Venda (Novo)
@@ -183,6 +184,7 @@ export interface MaintenanceRecord {
 export interface SystemSettings {
   maintenanceMode: boolean;
   minAppVersion?: string; // Versão mínima exigida do App (SemVer)
+  internalSystemPassword?: string; // Senha para acessar a área de login (Gateway)
   lastUpdatedBy: string;
   lastUpdatedAt: string;
 }

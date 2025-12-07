@@ -1,10 +1,11 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { SystemSettings, UserRole } from '../types';
 import { api } from '../services/api';
 import { Button } from './Button';
 import { Input } from './Input';
-import { ShieldAlert, Lock, Unlock, Power, Server, Activity, RefreshCw, AlertTriangle } from 'lucide-react';
+import { ShieldAlert, Lock, Unlock, Power, Server, Activity, RefreshCw, AlertTriangle, Key } from 'lucide-react';
 
 interface SystemControlProps {
   currentUserRole: UserRole;
@@ -15,10 +16,12 @@ export const SystemControl: React.FC<SystemControlProps> = ({ currentUserRole, o
   const [settings, setSettings] = useState<SystemSettings>({
     maintenanceMode: false,
     minAppVersion: '1.0.0',
+    internalSystemPassword: '',
     lastUpdatedBy: '-',
     lastUpdatedAt: '-'
   });
   const [minVersionInput, setMinVersionInput] = useState('');
+  const [internalPasswordInput, setInternalPasswordInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -30,6 +33,7 @@ export const SystemControl: React.FC<SystemControlProps> = ({ currentUserRole, o
     const data = await api.system.getSettings(true);
     setSettings(data);
     setMinVersionInput(data.minAppVersion || '1.0.0');
+    setInternalPasswordInput(data.internalSystemPassword || '');
   };
 
   const toggleMaintenance = async () => {
@@ -67,13 +71,35 @@ export const SystemControl: React.FC<SystemControlProps> = ({ currentUserRole, o
           lastUpdatedBy: 'Admin' 
         });
         
-        // Atualiza o estado visual IMEDIATAMENTE
         setSettings(updated);
         setMinVersionInput(updated.minAppVersion || '');
-        
         onNotify("Versão mínima atualizada.", 'success');
       } catch (error) {
         onNotify("Erro ao atualizar versão.", 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const updateInternalPassword = async () => {
+    if (!internalPasswordInput) {
+      alert("A senha não pode ser vazia.");
+      return;
+    }
+
+    if (confirm(`Confirmar alteração da Senha de Acesso Interno?`)) {
+      setIsLoading(true);
+      try {
+        const updated = await api.system.updateSettings({ 
+          internalSystemPassword: internalPasswordInput, 
+          lastUpdatedBy: 'Admin' 
+        });
+        
+        setSettings(updated);
+        onNotify("Senha de acesso interno atualizada com sucesso.", 'success');
+      } catch (error) {
+        onNotify("Erro ao atualizar senha interna.", 'error');
       } finally {
         setIsLoading(false);
       }
@@ -128,67 +154,53 @@ export const SystemControl: React.FC<SystemControlProps> = ({ currentUserRole, o
         </div>
 
         <div className="flex flex-col gap-6">
-          {/* Card de Informações */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm flex flex-col flex-1">
-             <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-               <Activity className="w-5 h-5 text-blue-600" /> Status do Banco de Dados
+          {/* Controle de Versão e Senha */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm flex flex-col gap-6 flex-1">
+             <h3 className="font-bold text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-2">
+               <AlertTriangle className="w-5 h-5 text-orange-600" /> Configurações de Segurança
              </h3>
              
-             <div className="space-y-4 flex-1">
-               <div className="bg-gray-50 p-4 rounded border border-gray-100">
-                 <p className="text-xs font-bold text-gray-500 uppercase mb-1">Método de Persistência</p>
-                 <p className="text-sm font-medium text-gray-800">Local Storage (Navegador) + Mock API</p>
-               </div>
-
-               <div className="bg-gray-50 p-4 rounded border border-gray-100">
-                 <p className="text-xs font-bold text-gray-500 uppercase mb-1">Segurança de Dados</p>
-                 <p className="text-sm font-medium text-gray-800">
-                   Os dados persistem na nuvem. O cache local é usado para performance.
-                 </p>
-               </div>
-
-               <div className="mt-auto bg-yellow-50 p-4 rounded border border-yellow-200">
-                 <p className="text-xs font-bold text-yellow-800 uppercase mb-1 flex items-center gap-1">
-                   <Power className="w-3 h-3" /> Nota de Versão
-                 </p>
-                 <p className="text-xs text-yellow-700">
-                   Última atualização de estado: {settings.lastUpdatedAt && settings.lastUpdatedAt !== '-' ? new Date(settings.lastUpdatedAt).toLocaleString() : 'N/A'}
-                 </p>
-                 <p className="text-xs text-yellow-700 font-bold mt-1">
-                   Por: {settings.lastUpdatedBy}
-                 </p>
-               </div>
-             </div>
-             
-             <div className="mt-4 pt-4 border-t border-gray-100">
-               <Button variant="secondary" className="w-full" onClick={loadSettings} icon={<RefreshCw className="w-4 h-4"/>}>
-                 Forçar Atualização de Status
-               </Button>
-             </div>
-          </div>
-
-          {/* Controle de Versão */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-             <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-               <AlertTriangle className="w-5 h-5 text-orange-600" /> Controle de Versão (Enforce Update)
-             </h3>
-             <div className="space-y-4">
-                <p className="text-sm text-gray-600">Defina a versão mínima do aplicativo (exe) para bloquear acessos desatualizados.</p>
+             {/* Versão Mínima */}
+             <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-600 uppercase">Versão Mínima do App (EXE)</label>
                 <div className="flex gap-2">
                   <Input 
-                    label="Versão Mínima (SemVer)" 
+                    label="" 
                     value={minVersionInput} 
                     onChange={e => setMinVersionInput(e.target.value)} 
                     placeholder="1.0.0"
                     className="flex-1"
                   />
-                  <div className="flex items-end">
-                    <Button onClick={updateMinVersion} isLoading={isLoading}>Salvar</Button>
-                  </div>
+                  <Button onClick={updateMinVersion} isLoading={isLoading}>Salvar</Button>
                 </div>
-                <p className="text-xs text-gray-400">
-                  Atual: {settings.minAppVersion || 'Não definido'}
-                </p>
+             </div>
+
+             {/* Senha do Gateway */}
+             <div className="space-y-2 pt-4 border-t border-gray-100">
+                <label className="text-xs font-bold text-gray-600 uppercase flex items-center gap-1">
+                   <Key className="w-3 h-3" /> Senha de Acesso Interno (Gateway)
+                </label>
+                <p className="text-[10px] text-gray-400">Senha necessária para sair do Catálogo Público e entrar no login corporativo.</p>
+                <div className="flex gap-2">
+                  <Input 
+                    label="" 
+                    type="text"
+                    value={internalPasswordInput} 
+                    onChange={e => setInternalPasswordInput(e.target.value)} 
+                    placeholder="Senha do Portal"
+                    className="flex-1"
+                  />
+                  <Button onClick={updateInternalPassword} isLoading={isLoading} className="bg-slate-700 hover:bg-slate-800">Alterar</Button>
+                </div>
+             </div>
+
+             <div className="mt-auto bg-yellow-50 p-4 rounded border border-yellow-200">
+               <p className="text-xs text-yellow-800 uppercase mb-1 flex items-center gap-1">
+                 <Power className="w-3 h-3" /> Última Alteração
+               </p>
+               <p className="text-xs text-yellow-700">
+                 {settings.lastUpdatedAt && settings.lastUpdatedAt !== '-' ? new Date(settings.lastUpdatedAt).toLocaleString() : 'N/A'} por {settings.lastUpdatedBy}
+               </p>
              </div>
           </div>
         </div>

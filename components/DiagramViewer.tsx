@@ -1,17 +1,20 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { AssemblyDiagram, AutoPart, OrderItem } from '../types';
 import { Button } from './Button';
-import { ShoppingCart, AlertCircle, CheckCircle, Info, Plus, ZoomIn, ZoomOut, Move, RotateCcw, X, Map } from 'lucide-react';
+import { ShoppingCart, AlertCircle, CheckCircle, Info, Plus, ZoomIn, ZoomOut, Move, RotateCcw, X, Map, ImageOff, Edit2, Trash2 } from 'lucide-react';
 
 interface DiagramViewerProps {
   diagram: AssemblyDiagram;
   parts: AutoPart[];
   onAddToOrder: (items: OrderItem[]) => void;
   onClose: () => void;
+  onEdit?: () => void; // Optional: For admin/stock users
+  onDelete?: () => void; // Optional: For admin/stock users
 }
 
-export const DiagramViewer: React.FC<DiagramViewerProps> = ({ diagram, parts, onAddToOrder, onClose }) => {
+export const DiagramViewer: React.FC<DiagramViewerProps> = ({ diagram, parts, onAddToOrder, onClose, onEdit, onDelete }) => {
   const [activeHotspotId, setActiveHotspotId] = useState<string | null>(null);
   
   // Estados de Transformação (Zoom e Pan)
@@ -82,6 +85,10 @@ export const DiagramViewer: React.FC<DiagramViewerProps> = ({ diagram, parts, on
     }
   };
 
+  const getPartImage = (part: AutoPart) => {
+    return (part.imageUrls && part.imageUrls.length > 0) ? part.imageUrls[0] : part.imageUrl;
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in">
       <div className="bg-white w-full max-w-7xl h-[95vh] rounded-lg shadow-2xl flex flex-col overflow-hidden relative border border-gray-700">
@@ -97,13 +104,27 @@ export const DiagramViewer: React.FC<DiagramViewerProps> = ({ diagram, parts, on
                <span className="text-[10px] text-gray-400 font-mono uppercase tracking-widest">{diagram.system}</span>
              </div>
            </div>
-           <button 
-             onClick={onClose} 
-             className="p-2 hover:bg-gray-700 rounded-full transition-colors"
-             title="Fechar"
-           >
-             <X className="w-6 h-6 text-gray-300" />
-           </button>
+           
+           <div className="flex items-center gap-2">
+             {onEdit && (
+               <button onClick={onEdit} className="p-2 hover:bg-gray-700 rounded text-gray-300 hover:text-white transition-colors" title="Editar Diagrama">
+                 <Edit2 className="w-5 h-5" />
+               </button>
+             )}
+             {onDelete && (
+               <button onClick={onDelete} className="p-2 hover:bg-red-900/50 rounded text-gray-300 hover:text-red-500 transition-colors" title="Excluir Diagrama">
+                 <Trash2 className="w-5 h-5" />
+               </button>
+             )}
+             <div className="h-6 w-px bg-gray-700 mx-2"></div>
+             <button 
+               onClick={onClose} 
+               className="p-2 hover:bg-gray-700 rounded-full transition-colors"
+               title="Fechar"
+             >
+               <X className="w-6 h-6 text-gray-300" />
+             </button>
+           </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden relative">
@@ -208,6 +229,17 @@ export const DiagramViewer: React.FC<DiagramViewerProps> = ({ diagram, parts, on
                        <p className="font-bold text-gray-900 text-xl leading-tight">{activePart.name}</p>
                     </div>
                     
+                    <div className="aspect-video w-full bg-gray-100 rounded border border-gray-200 flex items-center justify-center overflow-hidden">
+                       {getPartImage(activePart) ? (
+                         <img src={getPartImage(activePart)} alt={activePart.name} className="w-full h-full object-cover" />
+                       ) : (
+                         <div className="flex flex-col items-center text-gray-400">
+                           <ImageOff className="w-8 h-8 mb-1" />
+                           <span className="text-xs">Sem Imagem</span>
+                         </div>
+                       )}
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-gray-50 p-3 rounded border border-gray-200">
                          <p className="text-[10px] text-gray-500 uppercase font-bold">Código Interno</p>

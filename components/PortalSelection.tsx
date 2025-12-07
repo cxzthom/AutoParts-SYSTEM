@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Package, ShoppingCart, ArrowRight, Wrench, ShieldCheck, Server, Lock, AlertTriangle, Download } from 'lucide-react';
 import { api } from '../services/api';
@@ -57,7 +56,7 @@ export const PortalSelection: React.FC<PortalSelectionProps> = ({ onSelectPortal
             <Lock className="w-24 h-24 text-red-600 mx-auto mb-6" />
             <h1 className="text-4xl font-extrabold text-gray-900 mb-4">SISTEMA EM MANUTENÇÃO</h1>
             <p className="text-gray-600 text-lg mb-8">
-              O AutoParts ERP está passando por atualizações críticas de segurança e melhoria de infraestrutura.
+              O MEC System está passando por atualizações críticas de segurança e melhoria de infraestrutura.
               O acesso está temporariamente suspenso para usuários operacionais.
             </p>
             <div className="bg-red-50 p-4 rounded border border-red-200 mb-8">
@@ -100,7 +99,7 @@ export const PortalSelection: React.FC<PortalSelectionProps> = ({ onSelectPortal
 
       <div className="z-10 text-center mb-12">
         <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-2">
-          AutoParts <span className="text-red-600">ERP</span>
+          MEC <span className="text-red-600">System</span>
         </h1>
         <p className="text-gray-400 text-sm md:text-base uppercase tracking-widest font-medium">
           Selecione o módulo de acesso corporativo

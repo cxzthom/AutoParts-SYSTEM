@@ -1,5 +1,5 @@
 {
-  "name": "AutoPeças AI - Gestão de Estoque",
-  "description": "Sistema inteligente de cadastro e pesquisa de peças automotivas com validação de dados, controle de códigos (Interno/Original) e preenchimento via IA.",
+  "name": "MEC System - Gestão Integrada",
+  "description": "Sistema inteligente de gestão de peças, frota e manutenção automotiva com IA integrada.",
   "requestFramePermissions": []
 }

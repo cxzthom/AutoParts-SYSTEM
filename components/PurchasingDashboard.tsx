@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { Order, OrderStatus, AutoPart, SaleRecord } from '../types';
 import { Button } from './Button';
-import { Truck, CheckCircle, Clock, XCircle, FileText, AlertTriangle, Search, Package, Eye, X, Save, Edit2, ImageOff, ExternalLink, ShoppingCart, DollarSign } from 'lucide-react';
+import { Truck, CheckCircle, Clock, XCircle, FileText, AlertTriangle, Search, Package, Eye, X, Save, Edit2, ImageOff, ExternalLink, ShoppingCart, DollarSign, Calendar, User } from 'lucide-react';
 import { Input } from './Input';
 import { SalesDashboard } from './SalesDashboard';
 
@@ -95,6 +96,10 @@ export const PurchasingDashboard: React.FC<PurchasingDashboardProps> = ({
     }
   };
 
+  const getPartImage = (part: AutoPart) => {
+    return (part.imageUrls && part.imageUrls.length > 0) ? part.imageUrls[0] : part.imageUrl;
+  };
+
   const pendingCount = orders.filter(o => o.status === OrderStatus.PENDING).length;
 
   return (
@@ -165,96 +170,160 @@ export const PurchasingDashboard: React.FC<PurchasingDashboardProps> = ({
                 Nenhuma requisição de compra encontrada no momento.
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 font-bold">ID / Data</th>
-                      <th className="px-6 py-3 font-bold">Solicitante</th>
-                      <th className="px-6 py-3 font-bold">Itens</th>
-                      <th className="px-6 py-3 font-bold">Prioridade</th>
-                      <th className="px-6 py-3 font-bold">Status</th>
-                      <th className="px-6 py-3 font-bold text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {orders.map((order) => (
-                      <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-mono font-bold text-gray-900">#{order.id.slice(0,6).toUpperCase()}</div>
-                          <div className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-gray-800">{order.requesterName}</div>
-                          <div className="text-xs text-gray-500">Almoxarifado</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="space-y-1 cursor-pointer group" onClick={() => handleOpenOrderDetails(order)}>
-                            {order.items.slice(0, 2).map((item, idx) => (
-                              <div key={idx} className="flex justify-between text-xs text-gray-600 border-b border-gray-100 pb-1 last:border-0 group-hover:text-blue-600">
-                                <span className="truncate max-w-[150px]">{item.partName}</span>
-                                <span className="font-mono font-bold text-gray-900">x{item.quantity}</span>
-                              </div>
-                            ))}
-                            {order.items.length > 2 && <div className="text-xs text-gray-400 italic">+ {order.items.length - 2} itens...</div>}
-                            <div className="text-[10px] text-blue-600 font-bold mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                              <Eye className="w-3 h-3" /> Ver Detalhes
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          {order.priority === 'URGENTE' ? (
-                            <span className="inline-flex items-center gap-1 text-red-700 font-bold text-xs uppercase animate-pulse">
-                              <AlertTriangle className="w-3 h-3" /> Urgente
-                            </span>
-                          ) : (
-                            <span className="text-gray-500 text-xs font-medium">Normal</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {getStatusBadge(order.status)}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                           <div className="flex flex-col gap-2 items-end">
-                             {order.status === OrderStatus.PENDING && (
-                               <>
-                                <Button size="sm" onClick={() => onUpdateStatus(order.id, OrderStatus.QUOTING)} className="w-full text-xs">
-                                  Iniciar Cotação
-                                </Button>
-                                <button onClick={() => onUpdateStatus(order.id, OrderStatus.CANCELED)} className="text-xs text-red-600 hover:underline">
-                                  Recusar
-                                </button>
-                               </>
-                             )}
-                             {order.status === OrderStatus.QUOTING && (
-                               <Button size="sm" onClick={() => onUpdateStatus(order.id, OrderStatus.PURCHASED)} className="w-full text-xs bg-indigo-600 hover:bg-indigo-700 border-indigo-600">
-                                 Aprovar Compra
-                               </Button>
-                             )}
-                             {order.status === OrderStatus.PURCHASED && (
-                               <Button size="sm" onClick={() => onUpdateStatus(order.id, OrderStatus.IN_TRANSIT)} variant="secondary" className="w-full text-xs">
-                                 Marcar Enviado
-                               </Button>
-                             )}
-                             {order.status === OrderStatus.IN_TRANSIT && (
-                               <Button size="sm" onClick={() => onUpdateStatus(order.id, OrderStatus.DELIVERED)} className="w-full text-xs bg-green-600 hover:bg-green-700 border-green-600">
-                                 Confirmar Entrega
-                               </Button>
-                             )}
-                             {order.status === OrderStatus.DELIVERED && (
-                               <span className="text-xs text-gray-400 font-mono">ARQUIVADO</span>
-                             )}
-                             
-                             <Button variant="ghost" size="sm" className="w-full text-xs text-gray-500 mt-1" onClick={() => handleOpenOrderDetails(order)}>
-                               <Eye className="w-3 h-3 mr-1" /> Analisar
-                             </Button>
-                           </div>
-                        </td>
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-3 font-bold">ID / Data</th>
+                        <th className="px-6 py-3 font-bold">Solicitante</th>
+                        <th className="px-6 py-3 font-bold">Itens</th>
+                        <th className="px-6 py-3 font-bold">Prioridade</th>
+                        <th className="px-6 py-3 font-bold">Status</th>
+                        <th className="px-6 py-3 font-bold text-right">Ações</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {orders.map((order) => (
+                        <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="font-mono font-bold text-gray-900">#{order.id.slice(0,6).toUpperCase()}</div>
+                            <div className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="font-medium text-gray-800">{order.requesterName}</div>
+                            <div className="text-xs text-gray-500">Almoxarifado</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="space-y-1 cursor-pointer group" onClick={() => handleOpenOrderDetails(order)}>
+                              {order.items.slice(0, 2).map((item, idx) => (
+                                <div key={idx} className="flex justify-between text-xs text-gray-600 border-b border-gray-100 pb-1 last:border-0 group-hover:text-blue-600">
+                                  <span className="truncate max-w-[150px]">{item.partName}</span>
+                                  <span className="font-mono font-bold text-gray-900">x{item.quantity}</span>
+                                </div>
+                              ))}
+                              {order.items.length > 2 && <div className="text-xs text-gray-400 italic">+ {order.items.length - 2} itens...</div>}
+                              <div className="text-[10px] text-blue-600 font-bold mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                                <Eye className="w-3 h-3" /> Ver Detalhes
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            {order.priority === 'URGENTE' ? (
+                              <span className="inline-flex items-center gap-1 text-red-700 font-bold text-xs uppercase animate-pulse">
+                                <AlertTriangle className="w-3 h-3" /> Urgente
+                              </span>
+                            ) : (
+                              <span className="text-gray-500 text-xs font-medium">Normal</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            {getStatusBadge(order.status)}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                             <div className="flex flex-col gap-2 items-end">
+                               {order.status === OrderStatus.PENDING && (
+                                 <>
+                                  <Button size="sm" onClick={() => onUpdateStatus(order.id, OrderStatus.QUOTING)} className="w-full text-xs">
+                                    Iniciar Cotação
+                                  </Button>
+                                  <button onClick={() => onUpdateStatus(order.id, OrderStatus.CANCELED)} className="text-xs text-red-600 hover:underline">
+                                    Recusar
+                                  </button>
+                                 </>
+                               )}
+                               {order.status === OrderStatus.QUOTING && (
+                                 <Button size="sm" onClick={() => onUpdateStatus(order.id, OrderStatus.PURCHASED)} className="w-full text-xs bg-indigo-600 hover:bg-indigo-700 border-indigo-600">
+                                   Aprovar Compra
+                                 </Button>
+                               )}
+                               {order.status === OrderStatus.PURCHASED && (
+                                 <Button size="sm" onClick={() => onUpdateStatus(order.id, OrderStatus.IN_TRANSIT)} variant="secondary" className="w-full text-xs">
+                                   Marcar Enviado
+                                 </Button>
+                               )}
+                               {order.status === OrderStatus.IN_TRANSIT && (
+                                 <Button size="sm" onClick={() => onUpdateStatus(order.id, OrderStatus.DELIVERED)} className="w-full text-xs bg-green-600 hover:bg-green-700 border-green-600">
+                                   Confirmar Entrega
+                                 </Button>
+                               )}
+                               {order.status === OrderStatus.DELIVERED && (
+                                 <span className="text-xs text-gray-400 font-mono">ARQUIVADO</span>
+                               )}
+                               
+                               <Button variant="ghost" size="sm" className="w-full text-xs text-gray-500 mt-1" onClick={() => handleOpenOrderDetails(order)}>
+                                 <Eye className="w-3 h-3 mr-1" /> Analisar
+                               </Button>
+                             </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-4 p-4 bg-gray-50">
+                  {orders.map((order) => (
+                    <div key={order.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                      <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-2">
+                        <div>
+                          <div className="font-mono font-bold text-gray-900">#{order.id.slice(0,6).toUpperCase()}</div>
+                          <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                            <Calendar className="w-3 h-3" /> {new Date(order.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        {getStatusBadge(order.status)}
+                      </div>
+
+                      <div className="space-y-3 mb-4">
+                        <div className="flex items-center justify-between text-sm">
+                           <span className="text-gray-500 flex items-center gap-1"><User className="w-3 h-3"/> Solicitante:</span>
+                           <span className="font-medium text-gray-800">{order.requesterName}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                           <span className="text-gray-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Prioridade:</span>
+                           {order.priority === 'URGENTE' ? (
+                             <span className="text-red-700 font-bold uppercase animate-pulse">Urgente</span>
+                           ) : (
+                             <span className="text-gray-600">Normal</span>
+                           )}
+                        </div>
+                        <div className="bg-gray-50 p-2 rounded text-xs border border-gray-100">
+                           <p className="font-bold text-gray-500 mb-1 uppercase">Resumo ({order.items.length} itens)</p>
+                           {order.items.slice(0, 2).map((item, idx) => (
+                             <div key={idx} className="flex justify-between py-0.5">
+                               <span className="truncate max-w-[150px] text-gray-700">{item.partName}</span>
+                               <span className="font-bold">x{item.quantity}</span>
+                             </div>
+                           ))}
+                           {order.items.length > 2 && <span className="text-blue-600 italic">+ {order.items.length - 2} outros...</span>}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                         <Button variant="secondary" className="flex-1 text-xs" onClick={() => handleOpenOrderDetails(order)}>
+                           <Eye className="w-3 h-3 mr-1" /> Detalhes
+                         </Button>
+                         
+                         {order.status === OrderStatus.PENDING && (
+                           <Button className="flex-1 text-xs" onClick={() => onUpdateStatus(order.id, OrderStatus.QUOTING)}>Cotar</Button>
+                         )}
+                         {order.status === OrderStatus.QUOTING && (
+                           <Button className="flex-1 text-xs bg-indigo-600" onClick={() => onUpdateStatus(order.id, OrderStatus.PURCHASED)}>Comprar</Button>
+                         )}
+                         {order.status === OrderStatus.PURCHASED && (
+                           <Button className="flex-1 text-xs bg-orange-500" onClick={() => onUpdateStatus(order.id, OrderStatus.IN_TRANSIT)}>Enviar</Button>
+                         )}
+                         {order.status === OrderStatus.IN_TRANSIT && (
+                           <Button className="flex-1 text-xs bg-green-600" onClick={() => onUpdateStatus(order.id, OrderStatus.DELIVERED)}>Receber</Button>
+                         )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </>
@@ -284,16 +353,16 @@ export const PurchasingDashboard: React.FC<PurchasingDashboardProps> = ({
                 <div className="flex items-center gap-2">
                    <AlertTriangle className="w-4 h-4 text-yellow-600" />
                    <span className="text-xs font-bold text-yellow-800">MODO DE AUDITORIA:</span>
-                   <span className="text-xs text-yellow-700">Verifique os itens e fornecedores antes de aprovar.</span>
+                   <span className="text-xs text-yellow-700 hidden md:inline">Verifique os itens e fornecedores antes de aprovar.</span>
                 </div>
                 {!isEditingOrder ? (
                   <Button size="sm" variant="secondary" onClick={() => setIsEditingOrder(true)} icon={<Edit2 className="w-3 h-3" />}>
-                     Editar Itens do Pedido
+                     Editar Itens
                   </Button>
                 ) : (
                   <div className="flex gap-2">
                      <Button size="sm" variant="secondary" onClick={() => setIsEditingOrder(false)}>Cancelar</Button>
-                     <Button size="sm" onClick={handleSaveOrderCorrections} icon={<Save className="w-3 h-3" />}>Salvar Correções</Button>
+                     <Button size="sm" onClick={handleSaveOrderCorrections} icon={<Save className="w-3 h-3" />}>Salvar</Button>
                   </div>
                 )}
               </div>
@@ -309,6 +378,8 @@ export const PurchasingDashboard: React.FC<PurchasingDashboardProps> = ({
                         Erro: Dados da peça original (ID: {item.partId}) não encontrados.
                      </div>
                    );
+
+                   const partImage = getPartImage(fullPart);
 
                    return (
                      <div key={item.partId} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
@@ -332,7 +403,7 @@ export const PurchasingDashboard: React.FC<PurchasingDashboardProps> = ({
                               </span>
                            </div>
                            <div className="text-right flex items-center gap-2">
-                              <span className="text-xs text-gray-500 uppercase font-bold">Quantidade Solicitada</span>
+                              <span className="text-xs text-gray-500 uppercase font-bold">Qtd.</span>
                               {isEditingOrder ? (
                                 <input 
                                   type="number" 
@@ -342,7 +413,7 @@ export const PurchasingDashboard: React.FC<PurchasingDashboardProps> = ({
                                   className="w-16 px-2 py-1 text-sm font-bold text-red-700 bg-white border border-red-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
                                 />
                               ) : (
-                                <span className="text-xl font-bold text-red-700 bg-red-50 px-3 py-1 rounded border border-red-100">{item.quantity} un.</span>
+                                <span className="text-xl font-bold text-red-700 bg-red-50 px-3 py-1 rounded border border-red-100">{item.quantity}</span>
                               )}
                            </div>
                         </div>
@@ -350,9 +421,9 @@ export const PurchasingDashboard: React.FC<PurchasingDashboardProps> = ({
                         <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
                            {/* Coluna 1: Visual e Códigos */}
                            <div className="col-span-1 border-r border-gray-100 pr-4">
-                              <div className="aspect-square w-full bg-gray-100 rounded border border-gray-200 mb-4 flex items-center justify-center overflow-hidden">
-                                 {fullPart.imageUrl ? (
-                                   <img src={fullPart.imageUrl} alt={fullPart.name} className="w-full h-full object-cover" />
+                              <div className="aspect-square w-full bg-gray-100 rounded border border-gray-200 mb-4 flex items-center justify-center overflow-hidden h-32 lg:h-auto">
+                                 {partImage ? (
+                                   <img src={partImage} alt={fullPart.name} className="w-full h-full object-cover" />
                                  ) : (
                                    <div className="flex flex-col items-center text-gray-400">
                                      <ImageOff className="w-8 h-8 mb-1" />

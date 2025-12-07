@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Lock, Mail, Car, ArrowRight, ShieldCheck, Package, ShoppingCart, Wrench, Server, DollarSign, AlertOctagon, ChevronLeft, HelpCircle } from 'lucide-react';
 import { Button } from './Button';
@@ -29,7 +28,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ role, onLogin, onBack }) =
   let buttonColor = 'bg-red-600 hover:bg-red-700';
   let roleName = 'Almoxarifado';
   let roleIcon = <Package className="w-10 h-10 text-white opacity-90" />;
-  let placeholderEmail = "estoque@autoparts.com";
+  let placeholderEmail = "estoque@mecsystem.com";
   let description = "Gestão Logística & Inventário";
   let bgPattern = "radial-gradient(circle at 10% 20%, rgba(255, 0, 0, 0.1) 0%, transparent 20%)";
 
@@ -39,7 +38,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ role, onLogin, onBack }) =
     buttonColor = 'bg-blue-600 hover:bg-blue-700';
     roleName = 'Central de Compras';
     roleIcon = <ShoppingCart className="w-10 h-10 text-white opacity-90" />;
-    placeholderEmail = "compras@autoparts.com";
+    placeholderEmail = "compras@mecsystem.com";
     description = "Procurement & Cotações";
     bgPattern = "radial-gradient(circle at 90% 80%, rgba(0, 0, 255, 0.1) 0%, transparent 20%)";
   } else if (isMechanic) {
@@ -48,7 +47,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ role, onLogin, onBack }) =
     buttonColor = 'bg-orange-600 hover:bg-orange-700';
     roleName = 'Oficina Mecânica';
     roleIcon = <Wrench className="w-10 h-10 text-white opacity-90" />;
-    placeholderEmail = "mecanica@autoparts.com";
+    placeholderEmail = "mecanica@mecsystem.com";
     description = "Diagnóstico & Manutenção";
   } else if (isSales) {
     themeGradient = 'from-emerald-900 to-emerald-600';
@@ -56,7 +55,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ role, onLogin, onBack }) =
     buttonColor = 'bg-emerald-600 hover:bg-emerald-700';
     roleName = 'Frente de Caixa';
     roleIcon = <DollarSign className="w-10 h-10 text-white opacity-90" />;
-    placeholderEmail = "vendas@autoparts.com";
+    placeholderEmail = "vendas@mecsystem.com";
     description = "PDV & Faturamento";
   } else if (isAdmin) {
     themeGradient = 'from-slate-900 to-slate-800';
@@ -64,7 +63,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ role, onLogin, onBack }) =
     buttonColor = 'bg-slate-800 hover:bg-slate-900 border border-slate-700';
     roleName = 'Governança de TI';
     roleIcon = <Server className="w-10 h-10 text-white opacity-90" />;
-    placeholderEmail = "admin.ti@autoparts.com";
+    placeholderEmail = "admin.ti@mecsystem.com";
     description = "Administração Global";
   }
 
@@ -125,7 +124,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ role, onLogin, onBack }) =
             </div>
             
             <h1 className="text-3xl font-bold mb-2 tracking-tight">
-              AutoParts <span className="font-light opacity-80">ERP</span>
+              MEC <span className="font-light opacity-80">System</span>
             </h1>
             <div className="h-1 w-12 bg-white/50 rounded mb-4"></div>
             <p className="text-lg font-medium text-white/90">{roleName}</p>
@@ -224,7 +223,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ role, onLogin, onBack }) =
       
       {/* Footer Version Info */}
       <div className="absolute bottom-4 text-center w-full text-[10px] text-gray-400 font-mono">
-        v1.0.9 stable • Secured by AutoParts IT
+        v1.0.21 stable • Secured by MEC IT
       </div>
     </div>
   );

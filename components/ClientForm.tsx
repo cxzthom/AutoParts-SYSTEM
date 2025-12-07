@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AutoPart, PartStatus, PartCategory, POPULAR_BRANDS } from '../types';
 import { Button } from './Button';
 import { Input, Select } from './Input';
 import { generatePartProfile } from '../services/geminiService';
-import { Wand2, Save, Box, User, Hash, Image as ImageIcon, Upload, X, Cog, FileText } from 'lucide-react';
+import { Wand2, Save, Box, User, Hash, Image as ImageIcon, Upload, X, Cog, FileText, Clipboard, Plus } from 'lucide-react';
 
 interface ClientFormProps {
   onSave: (part: Omit<AutoPart, 'id' | 'createdAt'>) => void;
@@ -34,7 +34,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
     supplierEmail: '',
     supplierPhone: '',
     description: '',
-    imageUrl: '',
+    imageUrls: [] as string[], // Changed to Array
     manualUrl: '', 
     compatibleBrands: [] as string[]
   });
@@ -42,6 +42,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const availableBrands = useMemo(() => [...POPULAR_BRANDS, ...customBrands], [customBrands]);
   const availableCategories = useMemo(() => [...Object.values(PartCategory), ...customCategories], [customCategories]);
@@ -49,6 +50,12 @@ export const ClientForm: React.FC<ClientFormProps> = ({
   // Efeito para preencher o formulário se houver dados de edição ou prompt inicial
   useEffect(() => {
     if (partData) {
+        // Migration logic: if old part has imageUrl but no imageUrls, add it to array
+        let images = partData.imageUrls || [];
+        if (images.length === 0 && partData.imageUrl) {
+          images = [partData.imageUrl];
+        }
+
         setFormData({
             name: partData.name,
             internalCode: partData.internalCode,
@@ -60,7 +67,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
             supplierEmail: partData.supplierEmail,
             supplierPhone: partData.supplierPhone,
             description: partData.description,
-            imageUrl: partData.imageUrl || '',
+            imageUrls: images,
             manualUrl: partData.manualUrl || '',
             compatibleBrands: partData.compatibleBrands || []
         });
@@ -133,16 +140,77 @@ export const ClientForm: React.FC<ClientFormProps> = ({
     });
   };
 
+  // --- Image Handling Logic (File, Drag & Drop, Paste) ---
+  
+  const addImage = (base64: string) => {
+    if (formData.imageUrls.length >= 4) {
+      alert("Limite de 4 fotos atingido.");
+      return;
+    }
+    setFormData(prev => ({ ...prev, imageUrls: [...prev.imageUrls, base64] }));
+  };
+
+  const processImageFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert("Por favor, selecione apenas arquivos de imagem.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      addImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, imageUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
-    }
+    if (file) processImageFile(file);
+    e.target.value = ''; // Reset input
   };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (formData.imageUrls.length < 4) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (formData.imageUrls.length >= 4) return;
+    const file = e.dataTransfer.files[0];
+    if (file) processImageFile(file);
+  };
+
+  const handlePaste = useCallback((e: React.ClipboardEvent | ClipboardEvent) => {
+    // Check if the paste event has clipboard data
+    const items = (e as React.ClipboardEvent).clipboardData?.items || (e as ClipboardEvent).clipboardData?.items;
+    
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            processImageFile(file);
+            e.preventDefault(); // Prevent pasting the image binary into text inputs
+            return;
+          }
+        }
+      }
+    }
+  }, [formData.imageUrls]); // Dep changes
+
+  // Attach global paste listener for convenience
+  useEffect(() => {
+    const globalPasteHandler = (e: ClipboardEvent) => handlePaste(e);
+    window.addEventListener('paste', globalPasteHandler);
+    return () => window.removeEventListener('paste', globalPasteHandler);
+  }, [handlePaste]);
+
 
   const handleManualUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -155,8 +223,11 @@ export const ClientForm: React.FC<ClientFormProps> = ({
     }
   };
 
-  const removeImage = () => {
-    setFormData(prev => ({ ...prev, imageUrl: '' }));
+  const removeImage = (index: number) => {
+    setFormData(prev => ({ 
+      ...prev, 
+      imageUrls: prev.imageUrls.filter((_, i) => i !== index) 
+    }));
   };
 
   const removeManual = () => {
@@ -199,7 +270,7 @@ export const ClientForm: React.FC<ClientFormProps> = ({
         supplierPhone: profile.supplierPhone ? formatPhone(profile.supplierPhone) : '',
         supplierDoc: '', 
         description: profile.description || '',
-        imageUrl: '',
+        imageUrls: [],
         manualUrl: '',
         compatibleBrands: profile.compatibleBrands || []
       });
@@ -213,7 +284,12 @@ export const ClientForm: React.FC<ClientFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (runValidation()) {
-      onSave(formData as any);
+      // Map back to legacy imageUrl for compatibility + new imageUrls
+      const submission = {
+        ...formData,
+        imageUrl: formData.imageUrls.length > 0 ? formData.imageUrls[0] : '', // Primary image for legacy
+      };
+      onSave(submission);
     } else {
       alert("Corrija os campos em vermelho.");
     }
@@ -362,50 +438,81 @@ export const ClientForm: React.FC<ClientFormProps> = ({
            </h4>
            
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Upload Imagem */}
-              <div className="bg-gray-50 p-4 rounded border border-gray-200 flex flex-col items-center justify-center text-center">
-                 {formData.imageUrl ? (
-                   <div className="relative w-full h-48 bg-gray-200 rounded overflow-hidden mb-2 border border-gray-300">
-                     <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-contain" />
-                     <button type="button" onClick={removeImage} className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded hover:bg-red-700">
-                       <X className="w-4 h-4" />
-                     </button>
-                   </div>
-                 ) : (
-                   <div className="w-full h-48 border-2 border-dashed border-gray-300 rounded mb-2 flex flex-col items-center justify-center text-gray-400">
-                      <ImageIcon className="w-10 h-10 mb-2" />
-                      <span className="text-xs">Nenhuma imagem selecionada</span>
-                   </div>
-                 )}
-                 <label className="cursor-pointer bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-2 px-4 rounded inline-flex items-center gap-2 text-xs uppercase shadow-sm">
-                   <Upload className="w-4 h-4" />
-                   <span>Carregar Foto da Peça</span>
-                   <input type='file' className="hidden" accept="image/*" onChange={handleImageUpload} />
-                 </label>
+              {/* Upload Imagem com Drag & Drop e Grid */}
+              <div className="flex flex-col gap-2">
+                {formData.imageUrls.length < 4 ? (
+                  <div 
+                    className={`p-4 rounded border-2 border-dashed flex flex-col items-center justify-center text-center transition-all duration-200 h-40 ${
+                      isDragging 
+                        ? 'border-blue-500 bg-blue-50 scale-[1.02]' 
+                        : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+                    }`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                  >
+                     <div className="flex flex-col items-center justify-center text-gray-400">
+                        <ImageIcon className={`w-8 h-8 mb-2 ${isDragging ? 'text-blue-500' : 'text-gray-400'}`} />
+                        <span className="text-sm font-bold text-gray-600">
+                          {isDragging ? 'Solte a imagem aqui' : 'Arraste ou Cole (Ctrl+V)'}
+                        </span>
+                        <span className="text-[10px] mt-1">Até 4 fotos (PNG, JPG)</span>
+                     </div>
+                     <label className="mt-2 cursor-pointer bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-1 px-3 rounded inline-flex items-center gap-1 text-xs uppercase shadow-sm">
+                       <Upload className="w-3 h-3" />
+                       <span>Add Foto</span>
+                       <input type='file' className="hidden" accept="image/*" onChange={handleImageUpload} />
+                     </label>
+                  </div>
+                ) : (
+                  <div className="h-40 border-2 border-gray-200 bg-gray-50 rounded flex flex-col items-center justify-center text-gray-400">
+                    <p className="text-xs font-bold">Limite de 4 fotos atingido</p>
+                  </div>
+                )}
+
+                {/* Grid de Imagens */}
+                {formData.imageUrls.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2">
+                    {formData.imageUrls.map((url, index) => (
+                      <div key={index} className="relative aspect-square bg-white border border-gray-200 rounded overflow-hidden group shadow-sm">
+                        <img src={url} alt={`Part ${index}`} className="w-full h-full object-cover" />
+                        <button 
+                          type="button" 
+                          onClick={() => removeImage(index)} 
+                          className="absolute top-1 right-1 bg-red-600 text-white p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                          title="Remover foto"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        {index === 0 && <span className="absolute bottom-0 left-0 w-full bg-black/50 text-white text-[8px] text-center py-0.5 font-bold uppercase">Principal</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Upload Manual */}
-              <div className="bg-gray-50 p-4 rounded border border-gray-200 flex flex-col items-center justify-center text-center">
+              <div className="bg-gray-50 p-4 rounded border border-gray-200 flex flex-col items-center justify-center text-center h-full min-h-[160px]">
                  {formData.manualUrl ? (
-                    <div className="w-full h-48 bg-white border border-gray-300 rounded flex flex-col items-center justify-center text-green-600 mb-2 relative">
-                       <FileText className="w-12 h-12 mb-2" />
+                    <div className="w-full h-full bg-white border border-gray-300 rounded flex flex-col items-center justify-center text-green-600 relative shadow-sm p-4">
+                       <FileText className="w-10 h-10 mb-2" />
                        <span className="font-bold text-sm">Documento Anexado</span>
                        <span className="text-xs text-gray-500">Pronto para envio</span>
-                       <button type="button" onClick={removeManual} className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded hover:bg-red-700">
-                         <X className="w-4 h-4" />
+                       <button type="button" onClick={removeManual} className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded hover:bg-red-700 shadow-md">
+                         <X className="w-3 h-3" />
                        </button>
                     </div>
                  ) : (
-                    <div className="w-full h-48 border-2 border-dashed border-gray-300 rounded mb-2 flex flex-col items-center justify-center text-gray-400">
-                       <FileText className="w-10 h-10 mb-2" />
-                       <span className="text-xs">Nenhum manual técnico</span>
+                    <div className="w-full h-full border-2 border-dashed border-gray-300 rounded flex flex-col items-center justify-center text-gray-400 p-4">
+                       <FileText className="w-8 h-8 mb-2" />
+                       <span className="text-xs font-bold text-gray-500">Manual Técnico / PDF</span>
+                       <label className="mt-2 cursor-pointer bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-1 px-3 rounded inline-flex items-center gap-1 text-xs uppercase shadow-sm">
+                         <Upload className="w-3 h-3" />
+                         <span>Anexar</span>
+                         <input type='file' className="hidden" accept="image/*,application/pdf" onChange={handleManualUpload} />
+                       </label>
                     </div>
                  )}
-                 <label className="cursor-pointer bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-2 px-4 rounded inline-flex items-center gap-2 text-xs uppercase shadow-sm">
-                   <Upload className="w-4 h-4" />
-                   <span>Anexar Manual Técnico (PDF/Img)</span>
-                   <input type='file' className="hidden" accept="image/*,application/pdf" onChange={handleManualUpload} />
-                 </label>
               </div>
            </div>
 

@@ -1,10 +1,10 @@
 {
-  "name": "autoparts-erp-desktop",
+  "name": "mec-system-desktop",
   "private": true,
-  "version": "1.0.20",
+  "version": "1.0.21",
   "main": "electron/main.js",
-  "description": "Sistema ERP para Gestão de Autopeças (Desktop Windows)",
-  "author": "AutoParts IT",
+  "description": "MEC System - ERP para Gestão Automotiva",
+  "author": "MEC IT Solutions",
   "type": "module",
   "repository": {
     "type": "git",
@@ -47,8 +47,8 @@
     "wait-on": "^7.2.0"
   },
   "build": {
-    "appId": "com.autoparts.erp",
-    "productName": "AutoParts ERP",
+    "appId": "com.mecsystem.erp",
+    "productName": "MEC System",
     "files": [
       "dist/**/*",
       "electron/**/*",

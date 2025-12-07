@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Car, ShieldCheck, Server, Database, Lock } from 'lucide-react';
 
@@ -52,9 +51,9 @@ export const SplashScreen: React.FC = () => {
 
         {/* Title */}
         <h1 className="text-3xl font-extrabold tracking-tight mb-1">
-          AutoParts <span className="text-red-600">ERP</span>
+          MEC <span className="text-red-600">System</span>
         </h1>
-        <p className="text-gray-500 text-sm font-mono mb-10 uppercase tracking-widest">Enterprise Edition v1.0.9</p>
+        <p className="text-gray-500 text-sm font-mono mb-10 uppercase tracking-widest">Enterprise Edition v3.0.0</p>
 
         {/* Progress Bar Container */}
         <div className="w-full bg-gray-800 rounded-full h-1.5 mb-4 overflow-hidden border border-gray-700 relative">

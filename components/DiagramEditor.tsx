@@ -1,5 +1,6 @@
 
-import React, { useState, useRef } from 'react';
+
+import React, { useState, useRef, useEffect } from 'react';
 import { AssemblyDiagram, DiagramHotspot, MaintenanceSystem, AutoPart, PartStatus } from '../types';
 import { Button } from './Button';
 import { Input, Select } from './Input';
@@ -9,9 +10,10 @@ interface DiagramEditorProps {
   onSave: (diagram: Omit<AssemblyDiagram, 'id' | 'createdAt'>) => void;
   onCancel: () => void;
   parts: AutoPart[];
+  initialData?: AssemblyDiagram; // Optional: For editing mode
 }
 
-export const DiagramEditor: React.FC<DiagramEditorProps> = ({ onSave, onCancel, parts }) => {
+export const DiagramEditor: React.FC<DiagramEditorProps> = ({ onSave, onCancel, parts, initialData }) => {
   const [name, setName] = useState('');
   const [system, setSystem] = useState<MaintenanceSystem>(MaintenanceSystem.TRANSMISSION);
   const [imageUrl, setImageUrl] = useState('');
@@ -24,6 +26,16 @@ export const DiagramEditor: React.FC<DiagramEditorProps> = ({ onSave, onCancel, 
   const [labelNumber, setLabelNumber] = useState('');
   const [manualDescription, setManualDescription] = useState('');
   const [partSearch, setPartSearch] = useState('');
+
+  // Load initial data if provided (Edit Mode)
+  useEffect(() => {
+    if (initialData) {
+      setName(initialData.name);
+      setSystem(initialData.system);
+      setImageUrl(initialData.imageUrl);
+      setHotspots(initialData.hotspots);
+    }
+  }, [initialData]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -80,7 +92,7 @@ export const DiagramEditor: React.FC<DiagramEditorProps> = ({ onSave, onCancel, 
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
       <h2 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-        <Crosshair className="w-6 h-6 text-red-600" /> Editor de Vista Explodida
+        <Crosshair className="w-6 h-6 text-red-600" /> {initialData ? 'Editar Vista Explodida' : 'Novo Editor de Vista Explodida'}
       </h2>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

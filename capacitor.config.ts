@@ -1,8 +1,8 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.autoparts.erp',
-  appName: 'AutoParts ERP',
+  appId: 'com.mecsystem.erp',
+  appName: 'MEC System',
   webDir: 'dist',
   server: {
     androidScheme: 'https'
