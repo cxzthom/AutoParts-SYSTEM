@@ -1,3 +1,4 @@
+
 import { AutoPart, Order, OrderItem, User, VehicleInfo, MaintenanceRecord, UserRole, OrderStatus, PartCategory, PartStatus, SaleRecord, SystemSettings, CatalogConfig, SystemLog, AssemblyDiagram } from '../types';
 
 // --- CONFIGURAÇÃO ---
