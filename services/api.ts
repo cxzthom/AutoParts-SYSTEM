@@ -3,18 +3,14 @@ import { AutoPart, Order, OrderItem, User, VehicleInfo, MaintenanceRecord, UserR
 // --- CONFIGURAÇÃO ---
 
 // Tenta pegar do .env (Padrão Seguro)
+// Acessa de forma segura para evitar erros se import.meta.env não estiver definido
 const env = (import.meta as any).env || {};
 
-// --- ÁREA DE RECUPERAÇÃO DE ACESSO ---
-// Se o .env não funcionar, COLE SUA URL DO GOOGLE SCRIPT ABAIXO (entre as aspas):
-const MANUAL_URL_BACKUP = "https://script.google.com/macros/s/AKfycbyUbiA8AtqgvM4AzbiyhK55EnAbXcaE9dhJO0kOA4x-vPdsfIhZwTqDIA8L9C74O0yz/exec"; 
-// Exemplo: "https://script.google.com/macros/s/AKfycbx.../exec"
-
-const GOOGLE_SCRIPT_URL = env.VITE_GOOGLE_SCRIPT_URL || MANUAL_URL_BACKUP;
+const GOOGLE_SCRIPT_URL = env.VITE_GOOGLE_SCRIPT_URL;
 
 if (!GOOGLE_SCRIPT_URL) {
-  console.warn("AVISO: URL da API não encontrada. O sistema está rodando sem banco de dados (Modo Offline).");
-  console.warn("Para corrigir: Adicione a URL no arquivo .env ou na variável MANUAL_URL_BACKUP em services/api.ts");
+  console.error("ERRO CRÍTICO: VITE_GOOGLE_SCRIPT_URL não definida no arquivo .env");
+  console.warn("O sistema rodará em modo OFFLINE/MOCK. As alterações não serão persistidas.");
 }
 
 // --- CONFIGURAÇÃO DE VELOCIDADE ---
@@ -70,7 +66,7 @@ const db = {
 
     if (!GOOGLE_SCRIPT_URL) {
       if (!strict) return {}; // Return empty object if offline
-      throw new Error("API URL não configurada.");
+      throw new Error("API URL não configurada no arquivo .env.");
     }
 
     try {
@@ -111,8 +107,8 @@ const db = {
     globalCache[key] = value;
 
     if (!GOOGLE_SCRIPT_URL) {
-      console.warn("Modo Offline: Dados salvos apenas em memória (serão perdidos ao recarregar). Configure a URL da API.");
-      alert("ATENÇÃO: SISTEMA DESCONECTADO.\n\nSua URL do Google Script não foi encontrada.\nEdite o arquivo services/api.ts e coloque a URL em MANUAL_URL_BACKUP.");
+      console.warn("Modo Offline: Dados salvos apenas em memória (serão perdidos ao recarregar). Configure a URL da API no .env.");
+      alert("ATENÇÃO: SISTEMA DESCONECTADO.\n\nURL da API não configurada no .env.");
       return;
     }
 
