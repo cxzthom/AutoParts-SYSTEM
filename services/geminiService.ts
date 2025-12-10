@@ -1,8 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { PartStatus, PartCategory, POPULAR_BRANDS } from "../types";
 
-const apiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) ? process.env.API_KEY : '';
-const ai = new GoogleGenAI({ apiKey });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Schema for generating an auto part profile
 const partSchema = {
@@ -27,7 +26,7 @@ const partSchema = {
 };
 
 export const generatePartProfile = async (prompt: string) => {
-  if (!apiKey) throw new Error("API Key não encontrada");
+  if (!process.env.API_KEY) throw new Error("API Key não encontrada");
 
   try {
     const response = await ai.models.generateContent({
@@ -56,7 +55,7 @@ export const generatePartProfile = async (prompt: string) => {
 };
 
 export const analyzePartContext = async (partData: string) => {
-  if (!apiKey) return "API Key necessária para análise.";
+  if (!process.env.API_KEY) return "API Key necessária para análise.";
 
   try {
     const response = await ai.models.generateContent({

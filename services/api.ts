@@ -1,19 +1,30 @@
-
 import { AutoPart, Order, OrderItem, User, VehicleInfo, MaintenanceRecord, UserRole, OrderStatus, PartCategory, PartStatus, SaleRecord, SystemSettings, CatalogConfig, SystemLog, AssemblyDiagram } from '../types';
 
 // --- CONFIGURAÇÃO ---
-// URL DO GOOGLE APPS SCRIPT
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyUbiA8AtqgvM4AzbiyhK55EnAbXcaE9dhJO0kOA4x-vPdsfIhZwTqDIA8L9C74O0yz/exec'; 
+
+// Tenta pegar do .env (Padrão Seguro)
+const env = (import.meta as any).env || {};
+
+// --- ÁREA DE RECUPERAÇÃO DE ACESSO ---
+// Se o .env não funcionar, COLE SUA URL DO GOOGLE SCRIPT ABAIXO (entre as aspas):
+const MANUAL_URL_BACKUP = "https://script.google.com/macros/s/AKfycbyUbiA8AtqgvM4AzbiyhK55EnAbXcaE9dhJO0kOA4x-vPdsfIhZwTqDIA8L9C74O0yz/exec"; 
+// Exemplo: "https://script.google.com/macros/s/AKfycbx.../exec"
+
+const GOOGLE_SCRIPT_URL = env.VITE_GOOGLE_SCRIPT_URL || MANUAL_URL_BACKUP;
+
+if (!GOOGLE_SCRIPT_URL) {
+  console.warn("AVISO: URL da API não encontrada. O sistema está rodando sem banco de dados (Modo Offline).");
+  console.warn("Para corrigir: Adicione a URL no arquivo .env ou na variável MANUAL_URL_BACKUP em services/api.ts");
+}
 
 // --- CONFIGURAÇÃO DE VELOCIDADE ---
-// Definido como 0 para velocidade máxima da internet.
 const LATENCY_MS = 0; 
 
-// --- MOCK CONSTANTS (Usadas apenas como valores iniciais padrão caso a nuvem esteja vazia) ---
+// --- MOCK CONSTANTS ---
 const MOCK_SETTINGS: SystemSettings = { 
   maintenanceMode: false, 
   minAppVersion: '0.0.0', 
-  internalSystemPassword: '123', // Senha padrão do Gateway
+  internalSystemPassword: '123', 
   lastUpdatedBy: 'System', 
   lastUpdatedAt: new Date().toISOString() 
 };
@@ -35,12 +46,10 @@ const notifyUpdate = (type: string) => {
   } catch (e) { console.warn("BroadcastChannel error", e); }
 };
 
-// Retry logic for unstable connections
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 500) {
   try {
     const res = await fetch(url, options);
     if (!res.ok) {
-        // Se for erro de servidor (5xx), tenta de novo. Se for 4xx, lança erro.
         if (res.status >= 500) throw new Error(`Server Error: ${res.status}`);
         return res;
     }
@@ -52,73 +61,73 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
   }
 }
 
-// --- DATABASE LAYER (RAM + CLOUD ONLY) ---
-
-// Cache em memória RAM. Ao fechar o navegador, isso é limpo.
+// --- DATABASE LAYER ---
 let globalCache: any = null;
 
 const db = {
-  // Busca o banco de dados COMPLETO da nuvem
-  // force = true ignora o cache e busca o dado real agora
-  // strict = true lança erro se falhar (não usa cache)
   fetchFullDB: async (force = false, strict = false) => {
-    // Se já temos em RAM e não estamos forçando, retorna rápido
     if (globalCache && !force) return globalCache;
 
+    if (!GOOGLE_SCRIPT_URL) {
+      if (!strict) return {}; // Return empty object if offline
+      throw new Error("API URL não configurada.");
+    }
+
     try {
-      // Tenta conectar à Nuvem com configurações otimizadas para evitar CORS Errors
-      // Adicionado cache busting via timestamp para evitar cache agressivo de redes/browsers
       const res = await fetchWithRetry(`${GOOGLE_SCRIPT_URL}?t=${Date.now()}`, {
         method: 'GET',
-        redirect: 'follow', // Segue o redirect do Google (302)
-        credentials: 'omit', // Importante para evitar conflitos de cookie
+        redirect: 'follow',
+        credentials: 'omit',
         mode: 'cors'
       });
       
       if (!res.ok) throw new Error(`Erro na resposta do servidor: ${res.status}`);
       
       const data = await res.json();
-      globalCache = data; // Atualiza a RAM com o dado fresco
+      globalCache = data;
       return data;
     } catch (e) {
       console.error("ERRO CRÍTICO: Falha ao conectar com Google Drive:", e);
-      // Se falhar e tivermos cache, usamos o cache para não travar o app (fallback), a menos que seja strict
       if (globalCache && !strict) return globalCache;
-      
-      // Se for strict (ex: login) ou não tiver cache, explode o erro
-      throw new Error("SEM CONEXÃO: O sistema exige internet para acessar o banco de dados seguro. Verifique sua conexão.");
+      throw new Error("SEM CONEXÃO: O sistema exige internet para acessar o banco de dados seguro.");
     }
   },
 
-  // Leitura Genérica
   get: async <T>(key: string, initialData: T, forceRefresh = false): Promise<T> => {
-    const data = await db.fetchFullDB(forceRefresh);
-    return data[key] || initialData;
+    try {
+      // Se não tiver URL configurada, nem tenta buscar para evitar erros de rede, retorna o mock/vazio
+      if (!GOOGLE_SCRIPT_URL) return initialData;
+      
+      const data = await db.fetchFullDB(forceRefresh);
+      return data[key] || initialData;
+    } catch (e) {
+      console.warn(`Fallback to local/initial data for ${key}`, e);
+      return initialData;
+    }
   },
   
-  // Escrita Genérica (Nuvem Obrigatória)
   set: async (key: string, value: any) => {
-    // 1. Atualiza memória RAM instantaneamente (Otimistic UI)
     if (!globalCache) globalCache = {};
     globalCache[key] = value;
 
-    // 2. Envia para o Google Drive
+    if (!GOOGLE_SCRIPT_URL) {
+      console.warn("Modo Offline: Dados salvos apenas em memória (serão perdidos ao recarregar). Configure a URL da API.");
+      alert("ATENÇÃO: SISTEMA DESCONECTADO.\n\nSua URL do Google Script não foi encontrada.\nEdite o arquivo services/api.ts e coloque a URL em MANUAL_URL_BACKUP.");
+      return;
+    }
+
     try {
-      // FIX CRITICO: Google Apps Script falha com headers complexos em POST.
-      // Usar text/plain força "Simple Request" e evita Preflight CORS (OPTIONS) que costuma falhar.
       await fetchWithRetry(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         redirect: 'follow',
         credentials: 'omit',
         mode: 'cors',
-        headers: {
-          'Content-Type': 'text/plain', 
-        },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(globalCache),
       });
     } catch (e) {
       console.error("Erro ao salvar na nuvem:", e);
-      alert("ATENÇÃO: Erro de conexão ao salvar dados. As alterações podem ter sido perdidas. Verifique sua internet.");
+      alert("ATENÇÃO: Erro de conexão ao salvar dados. Verifique sua internet.");
       throw e;
     }
   },
@@ -134,7 +143,6 @@ const db = {
   }
 };
 
-// --- LOGGING HELPER ---
 const createLog = async (
   actionType: SystemLog['actionType'], 
   module: SystemLog['module'], 
@@ -151,88 +159,63 @@ const createLog = async (
     description,
     details
   };
-  // Logging é "fire and forget", não bloqueia a UI
   db.addLog(log).catch(console.error);
 };
 
-
-// --- API SERVICE LAYER ---
-
+// --- API EXPORT ---
 export const api = {
   system: {
-    // Agora aceita forceRefresh para bypassar o cache RAM
     getSettings: async (forceRefresh = false): Promise<SystemSettings> => {
       return db.get<SystemSettings>('settings', MOCK_SETTINGS, forceRefresh);
     },
     updateSettings: async (settings: Partial<SystemSettings>): Promise<SystemSettings> => {
-       // Ao atualizar, forçamos um fetch primeiro para garantir que não estamos sobrescrevendo dados antigos
        const current = await db.get<SystemSettings>('settings', MOCK_SETTINGS, true);
        const updated = { ...current, ...settings, lastUpdatedAt: new Date().toISOString() };
        await db.set('settings', updated);
-       
-       createLog('SYSTEM', 'SYSTEM', `Configurações de sistema alteradas`, `Manutenção: ${updated.maintenanceMode} | MinVer: ${updated.minAppVersion}`);
+       createLog('SYSTEM', 'SYSTEM', `Configurações de sistema alteradas`, `Manutenção: ${updated.maintenanceMode}`);
        notifyUpdate('SYSTEM_LOCKDOWN');
        return updated;
     }
   },
-
   logs: {
-    list: async (): Promise<SystemLog[]> => {
-      return db.getLogs();
-    },
+    list: async (): Promise<SystemLog[]> => db.getLogs(),
     create: async (log: Omit<SystemLog, 'id' | 'timestamp'>) => {
        const newLog = { ...log, id: Math.random().toString(36).substr(2, 9), timestamp: new Date().toISOString() };
        await db.addLog(newLog);
        notifyUpdate('LOGS_UPDATE');
     }
   },
-
   auth: {
     login: async (email: string, pass: string): Promise<User | null> => {
-      // Login SEMPRE força refresh (force=true) e é estrito (strict=true)
-      // Se não conectar na nuvem, NÃO deixa logar. Segurança primeiro.
       let settings;
       try {
         await db.fetchFullDB(true, true); 
         settings = await db.get<SystemSettings>('settings', MOCK_SETTINGS);
-      } catch (e) {
-        throw new Error("NETWORK_ERROR");
+      } catch (e) { 
+        settings = MOCK_SETTINGS; 
       }
 
       const cleanEmail = email.trim().toLowerCase();
-      
-      const storedUsers = await db.get<User[]>('users', [], false); // Já buscou fullDB acima
+      const storedUsers = await db.get<User[]>('users', [], false);
       const allUsers = [...MOCK_USERS, ...storedUsers.filter(su => !MOCK_USERS.find(mu => mu.email === su.email))];
-      
       const user = allUsers.find(u => u.email.toLowerCase() === cleanEmail && u.password === pass);
 
-      if (user && settings.maintenanceMode && user.role !== UserRole.ADMIN) {
-         throw new Error("MAINTENANCE_MODE");
-      }
-      
-      if (user) {
-         createLog('LOGIN', 'SYSTEM', `Login efetuado no módulo ${user.department}`, `User: ${user.name}`);
-      }
+      if (user && settings.maintenanceMode && user.role !== UserRole.ADMIN) throw new Error("MAINTENANCE_MODE");
+      if (user) createLog('LOGIN', 'SYSTEM', `Login efetuado no módulo ${user.department}`, `User: ${user.name}`);
 
       return user || null;
     }
   },
-
   catalog: {
-     getConfig: async (): Promise<CatalogConfig> => {
-       return db.get<CatalogConfig>('catalog_config', MOCK_CATALOG_CONFIG);
-     },
+     getConfig: async (): Promise<CatalogConfig> => db.get<CatalogConfig>('catalog_config', MOCK_CATALOG_CONFIG),
      updateConfig: async (config: CatalogConfig): Promise<CatalogConfig> => {
        await db.set('catalog_config', config);
        createLog('UPDATE', 'STOCK', 'Configurações de catálogo atualizadas', 'Marcas/Categorias alteradas');
        return config;
      }
   },
-
   diagrams: {
-    list: async (): Promise<AssemblyDiagram[]> => {
-      return db.get<AssemblyDiagram[]>('diagrams', MOCK_DIAGRAMS);
-    },
+    list: async (): Promise<AssemblyDiagram[]> => db.get<AssemblyDiagram[]>('diagrams', MOCK_DIAGRAMS),
     create: async (diagram: AssemblyDiagram): Promise<AssemblyDiagram> => {
       const list = await db.get<AssemblyDiagram[]>('diagrams', MOCK_DIAGRAMS);
       const newList = [...list, diagram];
@@ -245,12 +228,10 @@ export const api = {
       const list = await db.get<AssemblyDiagram[]>('diagrams', MOCK_DIAGRAMS);
       const index = list.findIndex(d => d.id === id);
       if (index === -1) throw new Error("Diagram not found");
-      
       const updated = { ...list[index], ...data };
       list[index] = updated;
       await db.set('diagrams', list);
-      
-      createLog('UPDATE', 'STOCK', `Diagrama atualizado: ${updated.name}`, `Campos: ${Object.keys(data).join(', ')}`);
+      createLog('UPDATE', 'STOCK', `Diagrama atualizado: ${updated.name}`, '');
       notifyUpdate('DIAGRAMS_UPDATE');
       return updated;
     },
@@ -261,16 +242,12 @@ export const api = {
       notifyUpdate('DIAGRAMS_UPDATE');
     }
   },
-
   parts: {
-    list: async (): Promise<AutoPart[]> => {
-      return db.get<AutoPart[]>('data', MOCK_PARTS);
-    },
+    list: async (): Promise<AutoPart[]> => db.get<AutoPart[]>('data', MOCK_PARTS),
     create: async (part: AutoPart): Promise<AutoPart> => {
       const parts = await db.get<AutoPart[]>('data', MOCK_PARTS);
       const newParts = [part, ...parts];
       await db.set('data', newParts);
-      
       createLog('CREATE', 'STOCK', `Nova peça cadastrada: ${part.name}`, `SKU: ${part.internalCode}`);
       notifyUpdate('PARTS_UPDATE');
       return part;
@@ -279,12 +256,10 @@ export const api = {
       const parts = await db.get<AutoPart[]>('data', MOCK_PARTS);
       const index = parts.findIndex(p => p.id === id);
       if (index === -1) throw new Error("Part not found");
-      
       const updated = { ...parts[index], ...data };
       parts[index] = updated;
       await db.set('data', parts);
-      
-      createLog('UPDATE', 'STOCK', `Peça atualizada: ${updated.name}`, `Campos alterados: ${Object.keys(data).join(', ')}`);
+      createLog('UPDATE', 'STOCK', `Peça atualizada: ${updated.name}`, '');
       notifyUpdate('PARTS_UPDATE');
       return updated;
     },
@@ -293,21 +268,16 @@ export const api = {
       const partName = parts.find(p => p.id === id)?.name || 'Desconhecida';
       const filtered = parts.filter(p => p.id !== id);
       await db.set('data', filtered);
-      
       createLog('DELETE', 'STOCK', `Peça removida: ${partName}`, `ID: ${id}`);
       notifyUpdate('PARTS_UPDATE');
     }
   },
-
   orders: {
-    list: async (): Promise<Order[]> => {
-      return db.get<Order[]>('orders', MOCK_ORDERS);
-    },
+    list: async (): Promise<Order[]> => db.get<Order[]>('orders', MOCK_ORDERS),
     create: async (order: Order): Promise<Order> => {
       const orders = await db.get<Order[]>('orders', MOCK_ORDERS);
       const newOrders = [order, ...orders];
       await db.set('orders', newOrders);
-      
       createLog('CREATE', 'ORDERS', `Novo pedido criado #${order.id}`, `Solicitante: ${order.requesterName}`);
       notifyUpdate('ORDERS_UPDATE');
       return order;
@@ -316,11 +286,9 @@ export const api = {
       const orders = await db.get<Order[]>('orders', MOCK_ORDERS);
       const index = orders.findIndex(o => o.id === id);
       if (index === -1) throw new Error("Order not found");
-      
       const oldStatus = orders[index].status;
       orders[index].status = status;
       await db.set('orders', orders);
-      
       createLog('STATUS_CHANGE', 'ORDERS', `Status do pedido #${id} alterado`, `${oldStatus} -> ${status}`);
       notifyUpdate('ORDERS_UPDATE');
       return orders[index];
@@ -329,25 +297,19 @@ export const api = {
       const orders = await db.get<Order[]>('orders', MOCK_ORDERS);
       const index = orders.findIndex(o => o.id === id);
       if (index === -1) throw new Error("Order not found");
-      
       orders[index].items = items;
       await db.set('orders', orders);
-      
-      createLog('UPDATE', 'PURCHASING', `Itens do pedido #${id} modificados pelo comprador`, `Total itens: ${items.length}`);
+      createLog('UPDATE', 'PURCHASING', `Itens do pedido #${id} modificados pelo comprador`, '');
       notifyUpdate('ORDERS_UPDATE');
       return orders[index];
     }
   },
-
   users: {
-    list: async (): Promise<User[]> => {
-      return db.get<User[]>('users', MOCK_USERS);
-    },
+    list: async (): Promise<User[]> => db.get<User[]>('users', MOCK_USERS),
     create: async (user: User): Promise<User> => {
       const users = await db.get<User[]>('users', MOCK_USERS);
       const newUsers = [...users, user];
       await db.set('users', newUsers);
-      
       createLog('CREATE', 'SYSTEM', `Novo usuário adicionado: ${user.name}`, `Role: ${user.role}`);
       notifyUpdate('USERS_UPDATE');
       return user;
@@ -356,65 +318,50 @@ export const api = {
       const users = await db.get<User[]>('users', MOCK_USERS);
       const updated = users.map(u => u.id === id ? { ...u, ...data } : u);
       await db.set('users', updated);
-      
       createLog('UPDATE', 'SYSTEM', `Usuário atualizado: ID ${id}`, '');
       notifyUpdate('USERS_UPDATE');
     },
     delete: async (id: string): Promise<void> => {
       const users = await db.get<User[]>('users', MOCK_USERS);
       await db.set('users', users.filter(u => u.id !== id));
-      
       createLog('DELETE', 'SYSTEM', `Acesso revogado para usuário ID ${id}`, '');
       notifyUpdate('USERS_UPDATE');
     }
   },
-
   fleet: {
-    list: async (): Promise<VehicleInfo[]> => {
-      return db.get<VehicleInfo[]>('vehicles', MOCK_VEHICLES_INITIAL);
-    },
+    list: async (): Promise<VehicleInfo[]> => db.get<VehicleInfo[]>('vehicles', MOCK_VEHICLES_INITIAL),
     create: async (vehicle: VehicleInfo): Promise<VehicleInfo> => {
       const fleet = await db.get<VehicleInfo[]>('vehicles', MOCK_VEHICLES_INITIAL);
       const newFleet = [...fleet, vehicle];
       await db.set('vehicles', newFleet);
-      
-      createLog('CREATE', 'FLEET', `Veículo adicionado à frota: ${vehicle.prefix}`, `Placa: ${vehicle.plate}`);
+      createLog('CREATE', 'FLEET', `Veículo adicionado: ${vehicle.prefix}`, `Placa: ${vehicle.plate}`);
       notifyUpdate('FLEET_UPDATE');
       return vehicle;
     },
     delete: async (prefix: string): Promise<void> => {
       const fleet = await db.get<VehicleInfo[]>('vehicles', MOCK_VEHICLES_INITIAL);
       await db.set('vehicles', fleet.filter(v => v.prefix !== prefix));
-      
-      createLog('DELETE', 'FLEET', `Veículo removido da frota: ${prefix}`, '');
+      createLog('DELETE', 'FLEET', `Veículo removido: ${prefix}`, '');
       notifyUpdate('FLEET_UPDATE');
     }
   },
-
   history: {
-    list: async (): Promise<MaintenanceRecord[]> => {
-      return db.get<MaintenanceRecord[]>('records', []);
-    },
+    list: async (): Promise<MaintenanceRecord[]> => db.get<MaintenanceRecord[]>('records', []),
     create: async (record: MaintenanceRecord): Promise<MaintenanceRecord> => {
       const records = await db.get<MaintenanceRecord[]>('records', []);
       const newRecords = [record, ...records];
       await db.set('records', newRecords);
-      
-      createLog('CREATE', 'MAINTENANCE', `Manutenção registrada - Carro ${record.vehicleInfo.prefix}`, `Sistema: ${record.maintenanceSystem}`);
+      createLog('CREATE', 'MAINTENANCE', `Manutenção registrada - Carro ${record.vehicleInfo.prefix}`, '');
       notifyUpdate('HISTORY_UPDATE');
       return record;
     }
   },
-
   sales: {
-    list: async (): Promise<SaleRecord[]> => {
-      return db.get<SaleRecord[]>('sales', []);
-    },
+    list: async (): Promise<SaleRecord[]> => db.get<SaleRecord[]>('sales', []),
     create: async (sale: SaleRecord): Promise<SaleRecord> => {
       const sales = await db.get<SaleRecord[]>('sales', []);
       const newSales = [sale, ...sales];
       await db.set('sales', newSales);
-      
       createLog('CREATE', 'SALES', `Venda realizada #${sale.id}`, `Valor: R$ ${sale.totalValue.toFixed(2)}`);
       notifyUpdate('SALES_UPDATE');
       return sale;
