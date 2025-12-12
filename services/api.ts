@@ -30,6 +30,8 @@ const GOOGLE_SCRIPT_URL = getEnvVar('VITE_GOOGLE_SCRIPT_URL') || FALLBACK_URL;
 if (!GOOGLE_SCRIPT_URL) {
   console.error("ERRO CRÍTICO: VITE_GOOGLE_SCRIPT_URL não definida no arquivo .env");
   console.warn("O sistema rodará em modo OFFLINE/MOCK. As alterações não serão persistidas.");
+} else {
+  console.log("MEC System: Modo Online Ativo. Conectado ao Backend.");
 }
 
 // --- CONFIGURAÇÃO DE VELOCIDADE ---
