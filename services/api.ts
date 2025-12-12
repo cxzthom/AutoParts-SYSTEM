@@ -3,10 +3,29 @@ import { AutoPart, Order, OrderItem, User, VehicleInfo, MaintenanceRecord, UserR
 // --- CONFIGURAÇÃO ---
 
 // Tenta pegar do .env (Padrão Seguro)
-// Acessa de forma segura para evitar erros se import.meta.env não estiver definido
-const env = (import.meta as any).env || {};
+// Usa uma abordagem segura para ler import.meta.env ou process.env (caso esteja em outro ambiente)
+const getEnvVar = (key: string): string => {
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      return import.meta.env[key] || '';
+    }
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env) {
+      // @ts-ignore
+      return process.env[key] || '';
+    }
+  } catch (e) {
+    console.warn('Erro ao ler variáveis de ambiente:', e);
+  }
+  return '';
+};
 
-const GOOGLE_SCRIPT_URL = env.VITE_GOOGLE_SCRIPT_URL;
+// URL de fallback caso a variável de ambiente falhe (Para garantir funcionamento imediato)
+const FALLBACK_URL = "";
+
+const GOOGLE_SCRIPT_URL = getEnvVar('VITE_GOOGLE_SCRIPT_URL') || FALLBACK_URL;
 
 if (!GOOGLE_SCRIPT_URL) {
   console.error("ERRO CRÍTICO: VITE_GOOGLE_SCRIPT_URL não definida no arquivo .env");
