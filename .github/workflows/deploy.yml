@@ -25,11 +25,12 @@ jobs:
           # Pega o link da planilha que salvamos nos Segredos do GitHub
           VITE_GOOGLE_SCRIPT_URL: ${{ secrets.VITE_GOOGLE_SCRIPT_URL }}
 
-      - name: Enviar para o Firebase
+- name: Enviar para o Firebase
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          # Usa a chave que você acabou de criar
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_MECSYSTEM_FIREBASE }}
           channelId: live
           projectId: mecsystem-firebase
+        env:
+          FIREBASE_CLI_EXPERIMENTS: webframeworks
