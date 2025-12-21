@@ -1,0 +1,1 @@
+export const VITE_GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyUbiA8AtqgvM4AzbiyhK55EnAbXcaE9dhJO0kOA4x-vPdsfIhZwTqDIA8L9C74O0yz/exec";
