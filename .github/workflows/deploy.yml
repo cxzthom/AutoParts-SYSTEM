@@ -22,10 +22,10 @@ jobs:
       - name: Construir o Site (Build)
         run: npm run build
         env:
-          # Pega o link da planilha que salvamos nos Segredos do GitHub
+          # Injeta a URL do Google Script para o site não ficar "cego"
           VITE_GOOGLE_SCRIPT_URL: ${{ secrets.VITE_GOOGLE_SCRIPT_URL }}
 
-- name: Enviar para o Firebase
+      - name: Enviar para o Firebase
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
@@ -33,4 +33,5 @@ jobs:
           channelId: live
           projectId: mecsystem-firebase
         env:
+          # A CORREÇÃO MÁGICA ESTÁ AQUI:
           FIREBASE_CLI_EXPERIMENTS: webframeworks
